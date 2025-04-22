@@ -1,2 +1,3 @@
-# saflii
-Tools to work with the safii database
+# Saflii Scraper
+
+Scrape the Saflii database: https://www.saflii.org/
