@@ -261,7 +261,7 @@ wheels = [
 
 [[package]]
 name = "crawlee"
-version = "0.6.7"
+version = "0.6.8"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "apify-fingerprint-datapoints" },
@@ -271,6 +271,7 @@ dependencies = [
     { name = "eval-type-backport" },
     { name = "httpx", extra = ["brotli", "http2", "zstd"] },
     { name = "more-itertools" },
+    { name = "protego" },
     { name = "psutil" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
@@ -281,9 +282,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "yarl" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/5d/3c/8a9610485f6df686a74cb45d57e4375608354279b133682d9e6c329c7909/crawlee-0.6.7.tar.gz", hash = "sha256:b132ad00a885054f9610be460f9fe91670b9fa74b2382329a9b596b6ae33e10f", size = 24061494 }
+sdist = { url = "https://files.pythonhosted.org/packages/ff/76/b45ccc6850d4ad2c864a7c4a92285d1c89fe7257639ceb6e98e313c6b488/crawlee-0.6.8.tar.gz", hash = "sha256:ba3f3a10b4113a00bc2986605f953dd348f8ac69b8619abdaaedb2f405f60b47", size = 24122493 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/3b/8d/ab88d0b45bfa9a95c474e747d47fd0a2e31f547aa6d30a70f6bbb6b70c26/crawlee-0.6.7-py3-none-any.whl", hash = "sha256:0ba48b2f0bc10e5ab6d0a7db63d7a6146ca646e5ed1fd3683abea3dbb8d5b42f", size = 251795 },
+    { url = "https://files.pythonhosted.org/packages/de/8b/0e6983ff039fed8b251857c80a3ab7f4dadbd2044be26290511017934d99/crawlee-0.6.8-py3-none-any.whl", hash = "sha256:cd34838a7d8f9ae1789179286fff37dfb9d3586106541248b3a74989fd2f1d8a", size = 254261 },
 ]
 
 [package.optional-dependencies]
@@ -791,6 +792,15 @@ wheels = [
 ]
 
 [[package]]
+name = "protego"
+version = "0.4.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/4e/6b/84e878d0567dfc11538bad6ce2595cee7ae0c47cf6bf7293683c9ec78ef8/protego-0.4.0.tar.gz", hash = "sha256:93a5e662b61399a0e1f208a324f2c6ea95b23ee39e6cbf2c96246da4a656c2f6", size = 3246425 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d9/fd/8d84d75832b0983cecf3aff7ae48362fe96fc8ab6ebca9dcf3cefd87e79c/Protego-0.4.0-py2.py3-none-any.whl", hash = "sha256:37640bc0ebe37572d624453a21381d05e9d86e44f89ff1e81794d185a0491666", size = 8553 },
+]
+
+[[package]]
 name = "psutil"
 version = "7.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1007,13 +1017,15 @@ name = "saflii"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "beautifulsoup4" },
     { name = "crawlee", extra = ["all"] },
     { name = "requests" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "crawlee", extras = ["all"], specifier = ">=0.6.7" },
+    { name = "beautifulsoup4", specifier = ">=4.13.4" },
+    { name = "crawlee", extras = ["all"], specifier = ">=0.6.8" },
     { name = "requests", specifier = ">=2.32.3" },
 ]
 
