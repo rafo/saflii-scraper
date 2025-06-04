@@ -1,0 +1,20 @@
+name: kotaemon
+services:
+  kotaemon:
+    environment:
+      - GRADIO_SERVER_NAME=0.0.0.0
+      - GRADIO_SERVER_PORT=7860
+    ports:
+      - 7860:7860
+    stdin_open: true
+    tty: true
+    platform: linux/arm64
+    image: ghcr.io/cinnamon/kotaemon:main-full
+    volumes:
+      - /Users/rafael/data/Projects/iTeamgGo/docker/koteamon/app_data:/app/ktem_app_data
+      - /Users/rafael/data/Projects/iTeamgGo/docker/koteamon/pipelines.py:/app/libs/ktem/ktem/index/file/graph/pipelines.py
+      - /Users/rafael/data/Projects/iTeamgGo/docker/koteamon/login.py:/app/libs/ktem/ktem/pages/login.py
+      - /Users/rafael/data/Projects/iTeamgGo/docker/koteamon/user.py:/app/libs/ktem/ktem/pages/resources/user.py
+      - /Users/rafael/data/Projects/iTeamgGo/docker/koteamon/pdf_viewer.js:/app/libs/ktem/ktem/assets/js/pdf_viewer.js
+      - /Users/rafael/data/Projects/iTeamgGo/docker/koteamon/render.py:/app/libs/ktem/ktem/utils/render.py
+      - /Users/rafael/data/Projects/iTeamgGo/docker/koteamon/app.py:/app/app.py
