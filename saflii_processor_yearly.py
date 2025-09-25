@@ -215,10 +215,11 @@ async def main():
     # Get user preferences for filters
     FILTER_COURT, FILTER_YEAR, DOWNLOAD_FORMAT = get_user_filters()
     
-    # Create HttpxHttpClient with timeout and redirect settings
+    # Create HttpxHttpClient with timeout, redirect settings, and SSL verification disabled
     http_client = HttpxHttpClient(
         timeout=60,  # 60-second timeout
-        follow_redirects=True  # Enable redirect following
+        follow_redirects=True,  # Enable redirect following
+        verify=False  # Disable SSL certificate verification
     )
     
     # Initialize crawler with anti-blocking settings
