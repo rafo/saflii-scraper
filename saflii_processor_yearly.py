@@ -184,24 +184,30 @@ async def download_and_save_file(url, http_client, filename_base):
         delay = random.uniform(0.5, 1.5)
         log.debug(f"Waiting {delay:.1f} seconds before downloading {url}")
         await asyncio.sleep(delay)
-        
+
         # Use Crawlee's HttpxHttpClient with built-in header generation
         crawl_result = await http_client.crawl(Request.from_url(url))
         http_response = crawl_result.http_response
-        
+
         if http_response.status_code >= 400:
             if http_response.status_code in [404, 410]:
                 log.info(f"File not available ({http_response.status_code}): {url}")
             else:
                 log.error(f"HTTP error downloading {url}: {http_response.status_code}")
             return False
-        
+
         # Access content using Crawlee's HttpxResponse read method
         content = http_response.read()
-        
+
         # Save the file content with provided filename
         return save_file_with_name(url, content, filename_base)
-        
+
+    except asyncio.TimeoutError as e:
+        log.warning(f"Download timeout for {url}: {e}")
+        return False
+    except asyncio.CancelledError as e:
+        log.warning(f"Download cancelled for {url}: {e}")
+        return False
     except Exception as e:
         log.error(f"Error downloading {url}: {e}")
         return False
@@ -217,16 +223,16 @@ async def main():
     
     # Create HttpxHttpClient with timeout, redirect settings, and SSL verification disabled
     http_client = HttpxHttpClient(
-        timeout=60,  # 60-second timeout
+        timeout=120,  # Increased to 120-second timeout for slow downloads
         follow_redirects=True,  # Enable redirect following
         verify=False  # Disable SSL certificate verification
     )
-    
+
     # Initialize crawler with anti-blocking settings
     crawler = SafliiCrawler(
         http_client=http_client,
         max_request_retries=5,  # Increase retries
-        request_handler_timeout=timedelta(minutes=3),  # 3 minutes timeout for processing with delays
+        request_handler_timeout=timedelta(minutes=8),  # Increased to 8 minutes timeout for processing with delays
         use_session_pool=True  # Enable session management for consistent behavior
     )
 
