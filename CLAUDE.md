@@ -33,30 +33,31 @@ docker-compose up -d
 
 ### Core Components
 
-1. **main.py** - Primary scraper targeting specific court documents
-   - Uses `SafliiHtmlCrawler` class extending BeautifulSoupCrawler
-   - Configured for targeted scraping (specific court, year, case number range)
-   - Includes random delays (1-3 seconds) between requests
-   - Processes 900 documents with 2 retry attempts
+1. **main.py** - Primary scraper targeting a specific court/year
+   - Uses `BeautifulSoupCrawler` directly
+   - Starts at the year index page and enqueues the actual document links
+   - Rate-limited via `ConcurrencySettings` (max 3 parallel, 60 requests/minute)
 
 2. **saflii_processor_yearly.py** - Comprehensive hierarchical scraper
    - Follows the complete Saflii site structure:
      1. Starts at databases.html (institution list)
      2. Navigates to court/institution pages
      3. Follows year links for each court
-     4. Downloads individual case documents
-   - Supports filtering by court (`FILTER_COURT`) and year (`FILTER_YEAR`)
+     4. Downloads individual case documents (HTML, PDF, RTF, or all)
+   - Interactive startup prompts for court filter, year filter, and download format
+     (collected into a `ScraperConfig` dataclass)
 
-3. **saflii_utils.py** - Core utility functions
-   - `parse_saflii_url()` - Extracts metadata (country, court, year, case number) from URLs
-   - `generate_filename_from_title()` - Creates filenames from HTML title tags
-   - `process_saflii_page()` - Saves HTML content with proper directory structure
+3. **saflii_utils.py** - Shared utility functions (single source of truth, used by both scrapers)
+   - `parse_saflii_url()` - Extracts metadata (country, court, year, case number, format) from URLs
+   - `generate_filename_from_title()` / `sanitize_filename()` - Create safe, length-capped filenames from HTML titles
+   - `build_file_path()` - Computes the target path (used to skip downloads for existing files)
+   - `save_file()` / `process_saflii_page()` - Save documents with proper directory structure
 
 ### Data Structure
 
 Documents are saved in a hierarchical structure:
 ```
-saflii_daten/
+saflii_data/
 ├── za/              # Country code (South Africa)
 │   └── ZAWCHC/      # Court code
 │       └── 2024/    # Year
@@ -68,7 +69,6 @@ saflii_daten/
 
 - **Crawlee** - Web crawling framework with BeautifulSoup integration
 - **BeautifulSoup4** - HTML parsing and processing
-- **Requests** - HTTP library (though primarily using Crawlee's built-in capabilities)
 
 ### URL Pattern Recognition
 
@@ -77,6 +77,13 @@ The scraper handles these URL patterns:
 - Court pages: `https://www.saflii.org/za/cases/{COURT_CODE}/`
 - Year pages: `https://www.saflii.org/za/cases/{COURT_CODE}/{YEAR}/`
 - Documents: `https://www.saflii.org/za/cases/{COURT_CODE}/{YEAR}/{NUMBER}.html`
+
+### Anti-Blocking
+
+- saflii.org returns 403 for plain HTTP clients (curl, httpx); both scrapers therefore use
+  `CurlImpersonateHttpClient(impersonate="chrome")` for browser-like TLS fingerprints
+- PDF/RTF downloads additionally require a `Referer` header (the document's HTML URL),
+  otherwise the server responds with 403
 
 ### Error Handling
 
@@ -88,12 +95,15 @@ The scraper handles these URL patterns:
 
 ### Configuration
 
-Key configuration variables in `saflii_processor_yearly.py`:
-- `FILTER_COURT` - Restrict to specific court (e.g., "ZAWCHC")
-- `FILTER_YEAR` - Restrict to specific year (e.g., "2024")
-- `BASE_DATA_DIR` - Output directory ("saflii_daten")
+`saflii_processor_yearly.py` asks interactively at startup (see `get_user_config()`):
+- Court filter (e.g., "ZAWCHC", exact match) - empty for all courts
+- Year filter (e.g., "2024", exact match) - empty for all years
+- Download format: html, pdf, rtf, or all
+
+Constants:
+- `BASE_DATA_DIR` in `saflii_utils.py` - Output directory ("saflii_data", shared by both scrapers)
+- `MAX_REQUESTS_PER_CRAWL` in `saflii_processor_yearly.py` - Safety limit (100,000)
 
 In `main.py`:
-- `country_code`, `court_code`, `year_str` - Target parameters
-- `max_requests_per_crawl` - Request limit (900)
-- `max_request_retries` - Retry attempts (2)
+- `COUNTRY_CODE`, `COURT_CODE`, `YEAR` - Target parameters
+- `MAX_REQUESTS_PER_CRAWL` - Request limit (2000)

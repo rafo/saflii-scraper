@@ -1,161 +1,124 @@
 # saflii_utils.py
+import logging
 import os
 import re
-import logging
+
 from bs4 import BeautifulSoup
 
-# Ihre Funktionen parse_saflii_url, generate_filename_from_title,
-# und process_saflii_page hier einfügen...
-# (Stellen Sie sicher, dass sie nur diese drei Funktionen enthält
-# und keine Download-Logik wie download_html oder download_year)
+log = logging.getLogger(__name__)
 
-BASE_DATA_DIR = "saflii_daten"  # Definieren Sie dies hier oder übergeben Sie es anders
+BASE_DATA_DIR = "saflii_data"
+
+# Characters that are invalid or problematic in filenames across platforms
+_INVALID_FILENAME_CHARS = re.compile(r'[\\/:*?"<>|\x00-\x1f]')
+# Keep filenames well below common filesystem limits (255 bytes)
+MAX_FILENAME_BASE_LENGTH = 150
+
+# Matches document URLs like /za/cases/ZAWCHC/2024/123.html (or .pdf/.rtf)
+DOCUMENT_URL_PATTERN = re.compile(
+    r"/([a-z]{2})/cases/([A-Z][A-Z0-9]*)/(\d{4})/(\d+)\.(html|pdf|rtf)$"
+)
 
 
 def parse_saflii_url(url):
-    """
-    Parst eine Saflii-URL, um Metadaten für Verzeichnisse und Logging zu extrahieren.
-    """
-    match = re.search(r"/([a-z]{2})/cases/([A-Z][A-Z0-9]+)/(\d{4})/(\d+)\.html$", url)
-    if match:
-        country, court, year, case_number = match.groups()
-        citation = f"[{year}] {court} {case_number}"
-        return {
-            "country": country,
-            "court": court,
-            "year": year,
-            "case_number": case_number,
-            "citation": citation,
-        }
-    else:
-        logging.warning(f"URL konnte nicht geparst werden: {url}")
+    """Extract metadata (country, court, year, case number, format) from a document URL."""
+    match = DOCUMENT_URL_PATTERN.search(url)
+    if not match:
+        log.warning(f"URL could not be parsed: {url}")
         return None
+    country, court, year, case_number, file_format = match.groups()
+    return {
+        "country": country,
+        "court": court,
+        "year": year,
+        "case_number": case_number,
+        "citation": f"[{year}] {court} {case_number}",
+        "format": file_format,
+    }
+
+
+def sanitize_filename(name, citation):
+    """Strip invalid characters, cap the length, and keep the citation as a unique suffix."""
+    cleaned = _INVALID_FILENAME_CHARS.sub("-", name).strip(" .")
+    if not cleaned:
+        return citation
+    if citation not in cleaned:
+        cleaned = f"{cleaned} {citation}"
+    if len(cleaned) > MAX_FILENAME_BASE_LENGTH:
+        keep = MAX_FILENAME_BASE_LENGTH - len(citation) - 1
+        cleaned = f"{cleaned[:keep].rstrip()} {citation}"
+    return cleaned
 
 
 def generate_filename_from_title(html_content, fallback_citation):
-    """
-    Extrahiert den Titel aus dem HTML, bereinigt ihn für die Dateibenennung.
-    """
+    """Extract the HTML title and turn it into a safe filename base."""
     try:
         soup = BeautifulSoup(html_content, "html.parser")
         title_tag = soup.find("title")
-        if title_tag and title_tag.string:
+        if title_tag:
             title_text = title_tag.get_text(strip=True)
-            filename_base = title_text.replace("/", "-")
-            # Optional: Entferne weitere potenziell problematische Zeichen (außer Leerzeichen)
-            # filename_base = re.sub(r'[\\:*?"<>|]', '', filename_base)
-            if filename_base:
-                logging.debug(f"Generierter Dateiname aus Titel: '{filename_base}'")
-                return filename_base
-            else:
-                logging.warning(
-                    f"Titel gefunden, aber nach Bereinigung leer. Verwende Fallback."
-                )
-                return fallback_citation
-        else:
-            logging.warning(
-                f"Kein Titel-Tag oder leerer Titel gefunden. Verwende Fallback: {fallback_citation}"
-            )
-            return fallback_citation
+            if title_text:
+                return sanitize_filename(title_text, fallback_citation)
+        log.warning(f"No usable title found, using fallback: {fallback_citation}")
     except Exception as e:
-        logging.error(
-            f"Fehler beim Extrahieren des Titels: {e}. Verwende Fallback: {fallback_citation}"
-        )
-        return fallback_citation
+        log.error(f"Error extracting title: {e}. Using fallback: {fallback_citation}")
+    return fallback_citation
 
 
-def process_saflii_page(url, html_content, base_dir):
-    """Verarbeitet heruntergeladenen HTML-Inhalt: Speichert nur die HTML-Datei."""
-    metadata = parse_saflii_url(url)
-    if not metadata:
-        return False
-
-    filename_base = generate_filename_from_title(html_content, metadata["citation"])
+def build_file_path(metadata, filename_base, base_dir=BASE_DATA_DIR):
+    """Target path for a document: base_dir/country/court/year/name.format"""
     target_dir = os.path.join(
         base_dir, metadata["country"], metadata["court"], metadata["year"]
     )
-    html_path = os.path.join(target_dir, f"{filename_base}.html")
-    # md_path wird nicht mehr benötigt
+    return os.path.join(target_dir, f"{filename_base}.{metadata['format']}")
 
-    # Prüfen, ob die HTML-Datei bereits existiert
-    if os.path.exists(html_path):
-        logging.info(
-            f"HTML-Datei existiert bereits für '{filename_base}', überspringe Speichern."
-        )
+
+def _remove_partial_file(file_path):
+    if os.path.exists(file_path):
+        try:
+            os.remove(file_path)
+            log.warning(f"Removed partially written file: {file_path}")
+        except OSError as e:
+            log.error(f"Could not remove partially written file {file_path}: {e}")
+
+
+def save_file(url, content, filename_base=None, base_dir=BASE_DATA_DIR):
+    """Save document content (str is written as UTF-8 text, bytes as binary).
+
+    Skips files that already exist. Returns True on success or skip.
+    """
+    metadata = parse_saflii_url(url)
+    if not metadata:
+        log.warning(f"Skipping URL (no match for save logic): {url}")
+        return False
+
+    if filename_base is None:
+        if metadata["format"] == "html" and isinstance(content, str):
+            filename_base = generate_filename_from_title(content, metadata["citation"])
+        else:
+            filename_base = metadata["citation"]
+
+    file_path = build_file_path(metadata, filename_base, base_dir)
+    if os.path.exists(file_path):
+        log.info(f"File already exists, skipping: {file_path}")
         return True
 
-    # Verzeichnis erstellen
     try:
-        os.makedirs(target_dir, exist_ok=True)
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        if isinstance(content, str):
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.write(content)
+        else:
+            with open(file_path, "wb") as f:
+                f.write(content)
+        log.info(f"Saved: {file_path}")
+        return True
     except OSError as e:
-        logging.error(f"Fehler beim Erstellen des Verzeichnisses {target_dir}: {e}")
+        log.error(f"Error saving {file_path}: {e}")
+        _remove_partial_file(file_path)
         return False
 
-    # HTML speichern
-    try:
-        with open(
-            html_path, "w", encoding="utf-8"
-        ) as f:  # utf-8 sollte gut sein, da wir vom Response-Encoding kommen
-            f.write(html_content)
-        logging.info(
-            f"HTML gespeichert: {html_path}"
-        )  # Geändert zu INFO, da es das Hauptergebnis ist
-    except IOError as e:
-        logging.error(f"Fehler beim Speichern der HTML-Datei {html_path}: {e}")
-        if os.path.exists(html_path):
-            try:
-                os.remove(html_path)
-                logging.warning(
-                    f"Teilweise geschriebene HTML-Datei entfernt: {html_path}"
-                )
-            except OSError as remove_error:
-                logging.error(
-                    f"Konnte teilweise geschriebene HTML-Datei nicht entfernen {html_path}: {remove_error}"
-                )
-        return False
 
-    # --- Block für Markdown-Konvertierung und -Speicherung wurde entfernt ---
-
-    return True  # Erfolg, wenn HTML gespeichert wurde
-
-
-# Fügen Sie hier den tatsächlichen Code der drei Funktionen ein
-# aus der Datei saflii_html_downloader.py
-# Beispiel für process_saflii_page (gekürzt):
-# def process_saflii_page(url, html_content, base_dir):
-#     """Verarbeitet heruntergeladenen HTML-Inhalt: Speichert nur die HTML-Datei."""
-#     metadata = parse_saflii_url(url)
-#     if not metadata:
-#         return False
-
-#     filename_base = generate_filename_from_title(html_content, metadata['citation'])
-#     target_dir = os.path.join(base_dir, metadata['country'], metadata['court'], metadata['year'])
-#     html_path = os.path.join(target_dir, f"{filename_base}.html")
-
-#     if os.path.exists(html_path):
-#         logging.info(f"HTML-Datei existiert bereits für '{filename_base}', überspringe Speichern.")
-#         return True
-
-#     try:
-#         os.makedirs(target_dir, exist_ok=True)
-#     except OSError as e:
-#         logging.error(f"Fehler beim Erstellen des Verzeichnisses {target_dir}: {e}")
-#         return False
-
-#     try:
-#         # Stellen Sie sicher, dass html_content ein String ist und korrektes Encoding hat
-#         # Crawlee liefert normalerweise einen dekodierten String in context.body
-#         with open(html_path, 'w', encoding='utf-8') as f:
-#             f.write(html_content)
-#         logging.info(f"HTML gespeichert: {html_path}")
-#         return True
-#     except IOError as e:
-#         logging.error(f"Fehler beim Speichern der HTML-Datei {html_path}: {e}")
-#         # Aufräumlogik...
-#         return False
-#     except Exception as e:
-#         logging.error(f"Unerwarteter Fehler beim Speichern von {html_path}: {e}")
-#         return False
-
-# Stellen Sie sicher, dass die tatsächlichen Implementierungen hier stehen!
-
+def process_saflii_page(url, html_content, base_dir=BASE_DATA_DIR):
+    """Save a downloaded HTML document page."""
+    return save_file(url, html_content, base_dir=base_dir)
