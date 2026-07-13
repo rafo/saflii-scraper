@@ -44,16 +44,24 @@ uv run python main.py
 ## Datenablage
 
 ```
-<Zielverzeichnis>/<Land>/<Kategorie>/<Gericht>/<Jahr>/<Urteilstitel>.<format>
-z.B. RE3_scraper_saflii_data/za/cases/ZAWCHC/2024/Abrahams v S (A188-2022) [2024] ZAWCHC 147 (20 May 2024).pdf
+<Zielverzeichnis>/<Format>/<Land>/<Kategorie>/<Gericht>/<Jahr>/<Urteilstitel>.<format>
+z.B. RE3_scraper_saflii_data/pdf/za/cases/ZAWCHC/2024/Abrahams v S (A188-2022) [2024] ZAWCHC 147 (20 May 2024).pdf
 ```
 
-Die Länderebene (`za`, …) bleibt erhalten, da SAFLII auch Urteile anderer
-afrikanischer Länder führt. Die Kategorie-Ebene (`cases`, `other`, `gaz`,
-`journals`, …) trennt SAFLIIs Dokumenttypen, sodass sie in RAGFlow als
-getrennte Datasets mit eigener Chunk-Konfiguration eingebunden werden können.
-Der Crawler selbst erfasst derzeit nur `cases` (Urteile); die anderen
-Bereiche folgen teils eigenen URL-Strukturen und sind ein separates Vorhaben.
+- **Format-Ebene** (`pdf`, `html`, …): trennt die Formate, damit RAGFlow-Datasets
+  komplette Ordner aus dem `pdf/`-Baum einbinden können, ohne dass HTML-Duplikate
+  mit importiert werden. `html/` ist Rohtext-Archiv und Fallback.
+- **Länderebene** (`za`, …): bleibt erhalten, da SAFLII auch Urteile anderer
+  afrikanischer Länder führt.
+- **Kategorie-Ebene** (`cases`, `other`, `gaz`, `journals`, …): trennt SAFLIIs
+  Dokumenttypen für getrennte RAGFlow-Datasets mit eigener Chunk-Konfiguration.
+  Der Crawler selbst erfasst derzeit nur `cases` (Urteile); die anderen Bereiche
+  folgen teils eigenen URL-Strukturen und sind ein separates Vorhaben.
+
+Dateinamen entsprechen dem vollen SAFLII-Dokumenttitel (Parteien, Aktenzeichen,
+neutrale Zitierung, Datum) — Anwälte brauchen den exakten Namen, und RAGFlow
+zeigt ihn als Quelle an. Bei Überlänge (>240 Bytes) werden die Parteinamen
+gekürzt, Zitierung und Datum bleiben immer erhalten.
 
 Bereits vorhandene Dateien werden übersprungen — ein abgebrochener Lauf kann
 einfach neu gestartet werden. Crawlee legt seinen Queue-/Fortschritts-State
