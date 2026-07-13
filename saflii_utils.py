@@ -14,21 +14,25 @@ _INVALID_FILENAME_CHARS = re.compile(r'[\\/:*?"<>|\x00-\x1f]')
 # Keep filenames well below common filesystem limits (255 bytes)
 MAX_FILENAME_BASE_LENGTH = 150
 
-# Matches document URLs like /za/cases/ZAWCHC/2024/123.html (or .pdf/.rtf)
+# Matches document URLs like /za/cases/ZAWCHC/2024/123.html (or .pdf/.rtf).
+# The category segment ("cases", "other", "gaz", "journals", ...) separates
+# SAFLII's document types and maps to distinct RAGFlow datasets. Collection
+# codes outside "cases" contain lowercase letters (ZACCRolls, ZAGovGaz).
 DOCUMENT_URL_PATTERN = re.compile(
-    r"/([a-z]{2})/cases/([A-Z][A-Z0-9]*)/(\d{4})/(\d+)\.(html|pdf|rtf)$"
+    r"/([a-z]{2})/([a-z]+)/([A-Z][A-Za-z0-9]*)/(\d{4})/(\d+)\.(html|pdf|rtf)$"
 )
 
 
 def parse_saflii_url(url):
-    """Extract metadata (country, court, year, case number, format) from a document URL."""
+    """Extract metadata (country, category, court, year, case number, format) from a document URL."""
     match = DOCUMENT_URL_PATTERN.search(url)
     if not match:
         log.warning(f"URL could not be parsed: {url}")
         return None
-    country, court, year, case_number, file_format = match.groups()
+    country, category, court, year, case_number, file_format = match.groups()
     return {
         "country": country,
+        "category": category,
         "court": court,
         "year": year,
         "case_number": case_number,
@@ -66,13 +70,18 @@ def generate_filename_from_title(html_content, fallback_citation):
 
 
 def build_file_path(metadata, filename_base, base_dir=BASE_DATA_DIR):
-    """Target path for a document: base_dir/country/court/year/name.format
+    """Target path for a document: base_dir/country/category/court/year/name.format
 
     The country level (e.g. "za") is kept because SAFLII also hosts case law
-    from other African countries.
+    from other African countries; the category level ("cases", "gaz", ...)
+    keeps document types apart for per-dataset ingestion into RAGFlow.
     """
     target_dir = os.path.join(
-        base_dir, metadata["country"], metadata["court"], metadata["year"]
+        base_dir,
+        metadata["country"],
+        metadata["category"],
+        metadata["court"],
+        metadata["year"],
     )
     return os.path.join(target_dir, f"{filename_base}.{metadata['format']}")
 
