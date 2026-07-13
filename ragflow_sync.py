@@ -62,9 +62,17 @@ def citation_of(name):
 
 
 def get_dataset(rag, name, apply_changes):
-    existing = rag.list_datasets(name=name)
-    if existing:
-        return existing[0]
+    # No server-side name filter: RAGFlow answers with a permission error
+    # (instead of an empty list) when no dataset matches the name.
+    page = 1
+    while True:
+        batch = rag.list_datasets(page=page, page_size=LIST_PAGE_SIZE)
+        for dataset in batch:
+            if dataset.name == name:
+                return dataset
+        if len(batch) < LIST_PAGE_SIZE:
+            break
+        page += 1
     if not apply_changes:
         log.info(f"Dataset '{name}' does not exist yet (would be created).")
         return None
