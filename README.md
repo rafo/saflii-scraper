@@ -67,6 +67,76 @@ Bereits vorhandene Dateien werden übersprungen — ein abgebrochener Lauf kann
 einfach neu gestartet werden. Crawlee legt seinen Queue-/Fortschritts-State
 unter `storage/` ab.
 
+## Aktualisierungs-Workflow: Scrape → Reconcile → Sync
+
+**Hintergrund:** SAFLII korrigiert Dokumenttitel nachträglich (2026-07-13 bei 12
+von ~440 ZAWCHC-2024-Urteilen beobachtet). Deshalb muss periodisch über den
+Bestand gescrapt werden — und danach müssen Sammlung und RAGFlow ohne Handarbeit
+nachziehen. Der stabile Schlüssel dafür ist die **neutrale Zitierung** im
+Dateinamen (z.B. `[2024] ZAWCHC 147`): Titel ändern sich, die Zitierung nie.
+
+### Schritt 1: Re-Scrape
+
+```bash
+uv run python saflii_processor_yearly.py   # Enter-Defaults genügen
+```
+
+Vorhandene Dateinamen werden übersprungen; heruntergeladen werden nur neue
+Urteile und titelkorrigierte (= neuer Dateiname). **Bekannte Lücke:** Ändert
+SAFLII den *Inhalt* ohne den Titel, wird das nicht erkannt (Abgleich läuft nur
+über Dateinamen).
+
+### Schritt 2: Duplikate auflösen — `reconcile.py`
+
+Nach Titelkorrekturen liegt dasselbe Urteil doppelt da (alter + neuer Name).
+
+```bash
+uv run python reconcile.py            # Dry-Run: zeigt nur, was passieren würde
+uv run python reconcile.py --apply    # löscht die Alt-Dateien wirklich
+```
+
+Gruppiert pro Ordner nach Zitierung + Endung, behält je Gruppe die neueste
+Datei (mtime) und löscht ältere. `--apply` schreibt ein JSON-Protokoll
+(`reconcile_log_<zeitstempel>.json`) mit jeder Löschung.
+
+### Schritt 3: RAGFlow abgleichen — `ragflow_sync.py`
+
+Gleicht einen lokalen PDF-Ordner (rekursiv) mit einem RAGFlow-Dataset ab.
+Lokal ist die Quelle der Wahrheit.
+
+```bash
+export RAGFLOW_API_KEY=ragflow-...    # RAGFlow-UI → Avatar → API → API-Key
+uv run python ragflow_sync.py \
+  "/Users/rafael/data/Work/RE3_scraper_saflii_data/pdf/za/cases/ZAWCHC" \
+  "SA Case Law ZAWCHC"                # Dry-Run
+# … Ausgabe prüfen, dann:
+uv run python ragflow_sync.py … --apply
+```
+
+Was pro Datei passiert:
+
+| Situation | Aktion | Kosten |
+|---|---|---|
+| Lokal neu, Zitierung unbekannt in RAGFlow | Upload + Parsing wird angestoßen | Embedding nur für neue Urteile |
+| Zitierung in RAGFlow unter altem Namen | Dokument wird **umbenannt** | keine — Inhalt identisch, kein Re-Parsing |
+| In RAGFlow, lokal nicht mehr vorhanden | nur mit `--delete` entfernt | — |
+
+Weitere Optionen: `--no-parse` (Parsing nicht anstoßen), `--base-url` bzw.
+`RAGFLOW_BASE_URL` (Default `http://127.0.0.1`), `--delete` (verwaiste
+Dokumente entfernen; bewusst kein Default).
+
+**Dataset-Zuordnung:** Ein Aufruf = ein Ordner → ein Dataset (wird bei
+`--apply` automatisch angelegt). Ob ein Dataset pro Gericht, pro Kategorie
+oder ein großes — das entscheidet einfach der übergebene Ordner-Pfad.
+
+### Alles zusammen (z.B. monatlich per Cron)
+
+```bash
+printf '\n\n\n\n' | uv run python saflii_processor_yearly.py   # 4×Enter = alle Defaults
+uv run python reconcile.py --apply
+uv run python ragflow_sync.py "<pdf-Ordner>" "<Dataset>" --apply
+```
+
 ## Wichtige Betriebs-Hinweise
 
 - **Rate-Limit:** saflii.org (hinter Cloudflare) blockt ab ca. 25 Anfragen/Minute

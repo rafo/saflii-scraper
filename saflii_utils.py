@@ -16,6 +16,11 @@ _INVALID_FILENAME_CHARS = re.compile(r'[\\/:*?"<>|\x00-\x1f]')
 # lawyers need the full document title (RAGFlow shows it as the source).
 MAX_FILENAME_BASE_LENGTH = 240
 
+# Neutral citation embedded in every filename, e.g. "[2024] ZAWCHC 147".
+# SAFLII's stable, unique key for a document: titles may be corrected
+# retroactively, but the citation (court + year + number) never changes.
+CITATION_PATTERN = re.compile(r"\[\d{4}\] [A-Z][A-Za-z0-9]+ \d+")
+
 # Matches document URLs like /za/cases/ZAWCHC/2024/123.html (or .pdf/.rtf).
 # The category segment ("cases", "other", "gaz", "journals", ...) separates
 # SAFLII's document types and maps to distinct RAGFlow datasets. Collection
