@@ -28,17 +28,28 @@ YEAR_PAGE_RE = re.compile(r"/cases/([A-Z][A-Z0-9]*)/(\d{4})/$")
 DOCUMENT_RE = re.compile(r"/cases/[A-Z][A-Z0-9]*/\d{4}/\d+\.html$")
 
 
+VALID_FORMATS = ("html", "pdf", "rtf")
+# PDF is the primary ingest format for RAGFlow (original look, citation
+# highlighting); HTML is the clean-text archive/fallback. RTF on request only.
+DEFAULT_FORMATS = "pdf,html"
+
+
 @dataclass
 class ScraperConfig:
     filter_court: str | None
     filter_year: str | None
-    download_format: str  # "html" | "pdf" | "rtf" | "all"
+    download_format: str  # "all" or comma-separated subset of VALID_FORMATS, e.g. "pdf,html"
 
     @property
     def formats(self):
         if self.download_format == "all":
-            return ["html", "pdf", "rtf"]
-        return [self.download_format]
+            return list(VALID_FORMATS)
+        seen = []
+        for fmt in self.download_format.split(","):
+            fmt = fmt.strip()
+            if fmt and fmt not in seen:
+                seen.append(fmt)
+        return seen
 
 
 def get_user_config() -> ScraperConfig:
@@ -54,10 +65,16 @@ def get_user_config() -> ScraperConfig:
     ).strip() or None
 
     while True:
-        download_format = input("Choose download format (html/pdf/rtf/all): ").strip().lower()
-        if download_format in ("html", "pdf", "rtf", "all"):
+        download_format = input(
+            "Choose download format(s) (html/pdf/rtf/all, combine with comma; "
+            "press Enter for 'pdf,html'): "
+        ).strip().lower() or DEFAULT_FORMATS
+        if download_format == "all":
             break
-        print("Please enter one of: html, pdf, rtf, all")
+        chosen = [fmt.strip() for fmt in download_format.split(",") if fmt.strip()]
+        if chosen and all(fmt in VALID_FORMATS for fmt in chosen):
+            break
+        print("Please enter 'all' or a comma-separated combination of: html, pdf, rtf")
 
     print("\nConfiguration:")
     print(f"  FILTER_COURT: {filter_court if filter_court else 'All courts'}")
@@ -66,6 +83,22 @@ def get_user_config() -> ScraperConfig:
     print()
 
     return ScraperConfig(filter_court, filter_year, download_format)
+
+
+def build_start_urls(config):
+    """Start as deep in the site hierarchy as the filters allow.
+
+    Visiting the databases index costs one request per court just to skip
+    them, which quickly exhausts saflii.org's rate limit. Note: direct
+    start URLs assume South African courts (za).
+    """
+    if config.filter_court and config.filter_year:
+        return [
+            f"https://www.saflii.org/za/cases/{config.filter_court}/{config.filter_year}/"
+        ]
+    if config.filter_court:
+        return [f"https://www.saflii.org/za/cases/{config.filter_court}/"]
+    return ["https://www.saflii.org/content/databases.html"]
 
 
 async def download_and_save_file(url, http_client, filename_base, referer_url):
@@ -114,15 +147,20 @@ async def main():
         timeout=120,  # generous timeout for slow downloads
     )
 
+    # saflii.org (behind Cloudflare) rate-limits with 429 at roughly
+    # 25 requests/minute and then blocks the IP entirely. Each document
+    # task makes one request per format (HTML fetch + PDF/RTF downloads),
+    # so derive the task rate from the format count to stay below ~20/min.
+    tasks_per_minute = max(20 // len(config.formats), 5)
+
     crawler = BeautifulSoupCrawler(
         http_client=http_client,
         max_request_retries=5,
         max_requests_per_crawl=MAX_REQUESTS_PER_CRAWL,
         request_handler_timeout=timedelta(minutes=8),
         use_session_pool=True,
-        # Polite crawling: few parallel requests, capped request rate
         concurrency_settings=ConcurrencySettings(
-            max_concurrency=3, max_tasks_per_minute=60
+            max_concurrency=1, max_tasks_per_minute=tasks_per_minute
         ),
     )
 
@@ -193,8 +231,7 @@ async def main():
                     f"{success_count}/{len(config.formats)} successful"
                 )
 
-    start_urls = ["https://www.saflii.org/content/databases.html"]
-    await crawler.run(start_urls)
+    await crawler.run(build_start_urls(config))
 
 
 if __name__ == "__main__":
