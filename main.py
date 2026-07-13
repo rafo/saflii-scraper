@@ -28,9 +28,9 @@ async def main() -> None:
         http_client=CurlImpersonateHttpClient(impersonate="chrome", timeout=120),
         max_requests_per_crawl=MAX_REQUESTS_PER_CRAWL,
         max_request_retries=2,
-        # Polite crawling: few parallel requests, capped request rate
+        # saflii.org rate-limits with 429 at roughly 25 requests/minute
         concurrency_settings=ConcurrencySettings(
-            max_concurrency=3, max_tasks_per_minute=60
+            max_concurrency=1, max_tasks_per_minute=20
         ),
     )
 
