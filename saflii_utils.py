@@ -66,12 +66,14 @@ def generate_filename_from_title(html_content, fallback_citation):
 
 
 def build_file_path(metadata, filename_base, base_dir=BASE_DATA_DIR):
-    """Target path for a document: base_dir/court/year/name.format
+    """Target path for a document: base_dir/country/court/year/name.format
 
-    The country level from the URL (always "za" on saflii.org) is dropped to
-    match the RAGFlow collection layout in RE3_scraper_saflii_data.
+    The country level (e.g. "za") is kept because SAFLII also hosts case law
+    from other African countries.
     """
-    target_dir = os.path.join(base_dir, metadata["court"], metadata["year"])
+    target_dir = os.path.join(
+        base_dir, metadata["country"], metadata["court"], metadata["year"]
+    )
     return os.path.join(target_dir, f"{filename_base}.{metadata['format']}")
 
 
