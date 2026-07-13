@@ -33,12 +33,16 @@ VALID_FORMATS = ("html", "pdf", "rtf")
 # highlighting); HTML is the clean-text archive/fallback. RTF on request only.
 DEFAULT_FORMATS = "pdf,html"
 
+# Central collection point for all scraped data, mounted into RAGFlow from here.
+DEFAULT_DATA_DIR = "/Users/rafael/data/Work/RE3_scraper_saflii_data"
+
 
 @dataclass
 class ScraperConfig:
     filter_court: str | None
     filter_year: str | None
     download_format: str  # "all" or comma-separated subset of VALID_FORMATS, e.g. "pdf,html"
+    data_dir: str = DEFAULT_DATA_DIR
 
     @property
     def formats(self):
@@ -76,13 +80,21 @@ def get_user_config() -> ScraperConfig:
             break
         print("Please enter 'all' or a comma-separated combination of: html, pdf, rtf")
 
+    data_dir = os.path.expanduser(
+        input(
+            f"Enter target directory (press Enter for '{DEFAULT_DATA_DIR}'): "
+        ).strip()
+        or DEFAULT_DATA_DIR
+    )
+
     print("\nConfiguration:")
     print(f"  FILTER_COURT: {filter_court if filter_court else 'All courts'}")
     print(f"  FILTER_YEAR: {filter_year if filter_year else 'All years'}")
     print(f"  DOWNLOAD_FORMAT: {download_format}")
+    print(f"  DATA_DIR: {data_dir}")
     print()
 
-    return ScraperConfig(filter_court, filter_year, download_format)
+    return ScraperConfig(filter_court, filter_year, download_format, data_dir)
 
 
 def build_start_urls(config):
@@ -101,13 +113,13 @@ def build_start_urls(config):
     return ["https://www.saflii.org/content/databases.html"]
 
 
-async def download_and_save_file(url, http_client, filename_base, referer_url):
+async def download_and_save_file(url, http_client, filename_base, referer_url, base_dir):
     """Download a file (PDF/RTF) and save it. Skips files that already exist."""
     metadata = parse_saflii_url(url)
     if not metadata:
         return False
 
-    file_path = build_file_path(metadata, filename_base)
+    file_path = build_file_path(metadata, filename_base, base_dir)
     if os.path.exists(file_path):
         log.info(f"File already exists, skipping download: {file_path}")
         return True
@@ -128,7 +140,7 @@ async def download_and_save_file(url, http_client, filename_base, referer_url):
                 log.error(f"HTTP error downloading {url}: {http_response.status_code}")
             return False
 
-        return save_file(url, http_response.read(), filename_base)
+        return save_file(url, http_response.read(), filename_base, base_dir)
 
     except asyncio.CancelledError:
         log.warning(f"Download cancelled: {url}")
@@ -216,12 +228,16 @@ async def main():
             success_count = 0
             for fmt in config.formats:
                 if fmt == "html":
-                    if save_file(url, html_content, filename_base):
+                    if save_file(url, html_content, filename_base, config.data_dir):
                         success_count += 1
                 else:
                     target_url = f"{url[:-len('html')]}{fmt}"
                     if await download_and_save_file(
-                        target_url, http_client, filename_base, referer_url=url
+                        target_url,
+                        http_client,
+                        filename_base,
+                        referer_url=url,
+                        base_dir=config.data_dir,
                     ):
                         success_count += 1
 
