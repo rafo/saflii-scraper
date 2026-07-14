@@ -1,0 +1,25 @@
+# SAFLII scraper as a Komodo/NAS stack.
+#
+# Host paths assume Birdsnest with the collection at
+# /data/Work/RE3_scraper_saflii_data — adjust if the share lives elsewhere.
+#
+# The crawl exits when it has swept the whole site; "on-failure" restarts
+# only crashes, not successful completion. For a periodic re-scrape, redeploy
+# the stack (or run it via Komodo schedule/cron).
+
+services:
+  saflii-scraper:
+    build: .
+    container_name: saflii-scraper
+    restart: on-failure
+    environment:
+      SAFLII_DATA_DIR: /downloads
+      SAFLII_FORMATS: ${SAFLII_FORMATS:-pdf,html}
+      # Leave empty to crawl all courts/years:
+      SAFLII_FILTER_COURT: ${SAFLII_FILTER_COURT:-}
+      SAFLII_FILTER_YEAR: ${SAFLII_FILTER_YEAR:-}
+    volumes:
+      # Collection on the NAS (mirrors /Users/rafael/data/Work on the Mac):
+      - /data/Work/RE3_scraper_saflii_data:/downloads
+      # Crawlee request-queue state — survives container restarts (resume):
+      - ./storage:/app/storage

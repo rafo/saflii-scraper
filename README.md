@@ -18,14 +18,47 @@ uv sync   # installiert Python 3.13 + Dependencies (Crawlee, BeautifulSoup, ...)
 uv run python saflii_processor_yearly.py
 ```
 
-Fragt beim Start interaktiv ab (Enter übernimmt jeweils den Default):
+Konfiguration über Umgebungsvariablen; fehlt eine Variable, wird im Terminal
+interaktiv nachgefragt (Enter = Default). Ohne Terminal (Docker, Cron,
+Pipe) gelten automatisch Env-Wert bzw. Default:
 
-| Prompt | Bedeutung | Default |
-|---|---|---|
-| `FILTER_COURT` | Gerichtskürzel, z.B. `ZAWCHC` | alle Gerichte |
-| `FILTER_YEAR` | Jahr, z.B. `2024` | alle Jahre |
-| Format(e) | `html`, `pdf`, `rtf`, `all` oder Kombination wie `pdf,html` | `pdf,html` |
-| Zielverzeichnis | Ablageort der Downloads | `/Users/rafael/data/Work/RE3_scraper_saflii_data` |
+| Env-Variable | Prompt | Bedeutung | Default |
+|---|---|---|---|
+| `SAFLII_FILTER_COURT` | `FILTER_COURT` | Gerichtskürzel, z.B. `ZAWCHC` | alle Gerichte |
+| `SAFLII_FILTER_YEAR` | `FILTER_YEAR` | Jahr, z.B. `2024` | alle Jahre |
+| `SAFLII_FORMATS` | Format(e) | `html`, `pdf`, `rtf`, `all` oder Kombination wie `pdf,html` | `pdf,html` |
+| `SAFLII_DATA_DIR` | Zielverzeichnis | Ablageort der Downloads | `/Users/rafael/data/Work/RE3_scraper_saflii_data` |
+
+### Betrieb als Docker-Container (NAS/Komodo)
+
+Der Scraper läuft dauerhaft am besten auf dem NAS (Birdsnest, x86_64) —
+tagelange Crawls hängen dann nicht am Mac, und die Daten entstehen direkt
+auf dem NAS-Volume.
+
+```bash
+docker compose up -d --build   # oder: Stack in Komodo anlegen/deployen
+docker logs -f saflii-scraper
+```
+
+- `compose.yaml` mountet `/data/Work/RE3_scraper_saflii_data` (NAS) nach
+  `/downloads` und setzt `SAFLII_DATA_DIR` entsprechend.
+- `./storage` (Crawlee-Queue) ist ebenfalls gemountet → nach Container-
+  Neustart wird fortgesetzt statt neu begonnen; zusätzlich überspringt der
+  Scraper ohnehin alle bereits vorhandenen Dateien.
+- Der Container beendet sich nach vollständigem Durchlauf selbst
+  (`restart: on-failure` startet nur Abstürze neu). Re-Scrape = Stack in
+  Komodo neu deployen.
+- Filter per Env im Stack setzen, z.B. `SAFLII_FILTER_COURT=ZAWCHC`.
+
+**Entwicklungs-Workflow:** Entwickelt und getestet wird lokal auf dem Mac
+(dieses Repo, `uv run …` — die interaktiven Prompts funktionieren weiter).
+Deployment aufs NAS = Projektordner auf das docker-Share kopieren und den
+Stack in Komodo redeployen (baut das Image neu):
+
+```bash
+rsync -a --delete --exclude .venv --exclude storage --exclude saflii_data \
+  --exclude .git "$(pwd)/" /Volumes/docker/saflii-scraper/
+```
 
 **Warum `pdf,html` als Default:** Das PDF ist das Original-Gerichtsdokument
 (aus Word erzeugt, kein Scan) und das primäre Ingest-Format für RAGFlow
@@ -132,10 +165,13 @@ oder ein großes — das entscheidet einfach der übergebene Ordner-Pfad.
 ### Alles zusammen (z.B. monatlich per Cron)
 
 ```bash
-printf '\n\n\n\n' | uv run python saflii_processor_yearly.py   # 4×Enter = alle Defaults
+uv run python saflii_processor_yearly.py < /dev/null   # ohne TTY: alle Defaults
 uv run python reconcile.py --apply
 uv run python ragflow_sync.py "<pdf-Ordner>" "<Dataset>" --apply
 ```
+
+(Läuft der Scraper als NAS-Container, ersetzt „Stack redeployen" die erste
+Zeile; Reconcile + Sync laufen weiterhin dort, wo RAGFlow erreichbar ist.)
 
 ## Wichtige Betriebs-Hinweise
 

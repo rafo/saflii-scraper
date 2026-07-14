@@ -3,6 +3,7 @@ import logging
 import os
 import random
 import re
+import sys
 from dataclasses import dataclass
 from datetime import timedelta
 
@@ -57,33 +58,59 @@ class ScraperConfig:
 
 
 def get_user_config() -> ScraperConfig:
-    """Ask user for court/year filters and download format preferences."""
-    print("\n--- Saflii Scraper Configuration ---")
+    """Configuration from SAFLII_* env vars (container/cron) or prompts (TTY).
 
-    filter_court = input(
-        "Enter FILTER_COURT (e.g., 'ZAWCHC' or press Enter for all courts): "
-    ).strip() or None
+    Every setting first checks its environment variable. Missing values are
+    prompted for only when stdin is a terminal; otherwise the default applies,
+    so the scraper runs unattended in Docker or cron without any input.
+    """
+    interactive = sys.stdin.isatty()
 
-    filter_year = input(
-        "Enter FILTER_YEAR (e.g., '2024' or press Enter for all years): "
-    ).strip() or None
+    def setting(env_key, prompt_text):
+        value = os.environ.get(env_key)
+        if value is not None:
+            return value.strip()
+        if interactive:
+            return input(prompt_text).strip()
+        return ""
+
+    if interactive:
+        print("\n--- Saflii Scraper Configuration ---")
+
+    filter_court = setting(
+        "SAFLII_FILTER_COURT",
+        "Enter FILTER_COURT (e.g., 'ZAWCHC' or press Enter for all courts): ",
+    ) or None
+
+    filter_year = setting(
+        "SAFLII_FILTER_YEAR",
+        "Enter FILTER_YEAR (e.g., '2024' or press Enter for all years): ",
+    ) or None
 
     while True:
-        download_format = input(
-            "Choose download format(s) (html/pdf/rtf/all, combine with comma; "
-            "press Enter for 'pdf,html'): "
-        ).strip().lower() or DEFAULT_FORMATS
+        download_format = (
+            setting(
+                "SAFLII_FORMATS",
+                "Choose download format(s) (html/pdf/rtf/all, combine with comma; "
+                f"press Enter for '{DEFAULT_FORMATS}'): ",
+            ).lower()
+            or DEFAULT_FORMATS
+        )
         if download_format == "all":
             break
         chosen = [fmt.strip() for fmt in download_format.split(",") if fmt.strip()]
         if chosen and all(fmt in VALID_FORMATS for fmt in chosen):
             break
+        if not interactive:
+            log.error(f"Invalid SAFLII_FORMATS: {download_format!r}")
+            sys.exit(1)
         print("Please enter 'all' or a comma-separated combination of: html, pdf, rtf")
 
     data_dir = os.path.expanduser(
-        input(
-            f"Enter target directory (press Enter for '{DEFAULT_DATA_DIR}'): "
-        ).strip()
+        setting(
+            "SAFLII_DATA_DIR",
+            f"Enter target directory (press Enter for '{DEFAULT_DATA_DIR}'): ",
+        )
         or DEFAULT_DATA_DIR
     )
 

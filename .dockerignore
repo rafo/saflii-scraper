@@ -1,0 +1,7 @@
+.venv/
+storage/
+saflii_data/
+__pycache__/
+*.pyc
+reconcile_log_*.json
+.git/
