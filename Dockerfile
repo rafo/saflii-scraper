@@ -10,6 +10,10 @@ RUN uv sync --frozen --no-dev
 
 COPY saflii_processor_yearly.py saflii_utils.py reconcile.py ragflow_sync.py main.py ./
 
+# Crawlee state dir — world-writable so the container runs under any
+# `user:` mapping; a named volume inherits these permissions on first use.
+RUN mkdir -p /app/storage && chmod 1777 /app/storage
+
 # Unbuffered so logs stream live into `docker logs`
 ENV PYTHONUNBUFFERED=1
 

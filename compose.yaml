@@ -1,15 +1,18 @@
-# SAFLII scraper as a Komodo/NAS stack.
+# SAFLII scraper as a Komodo/NAS stack (UI-defined friendly: no files
+# needed on the server — the image comes from ghcr.io, built by GitHub
+# Actions on every push to main).
 #
-# Host paths assume Birdsnest with the collection at
-# /data/Work/RE3_scraper_saflii_data — adjust if the share lives elsewhere.
+# Host path assumes Birdsnest with the collection at
+# /volume1/data/Work/RE3_scraper_saflii_data — verify the volume number
+# in DSM (Shared Folders) before deploying.
 #
 # The crawl exits when it has swept the whole site; "on-failure" restarts
-# only crashes, not successful completion. For a periodic re-scrape, redeploy
-# the stack (or run it via Komodo schedule/cron).
+# only crashes, not successful completion. For a periodic re-scrape,
+# redeploy the stack (or run it via Komodo schedule/cron).
 
 services:
   saflii-scraper:
-    build: .
+    image: ghcr.io/rafo/saflii-scraper:latest
     container_name: saflii-scraper
     restart: on-failure
     # NAS user — downloads land with sane ownership instead of root:
@@ -25,10 +28,13 @@ services:
       SAFLII_FILTER_YEAR: ${SAFLII_FILTER_YEAR:-}
     volumes:
       # Collection on the NAS (mirrors /Users/rafael/data/Work on the Mac):
-      - /data/Work/RE3_scraper_saflii_data:/downloads
+      - /volume1/data/Work/RE3_scraper_saflii_data:/downloads
       # Crawlee request-queue state — survives container restarts (resume):
-      - ./storage:/app/storage
+      - saflii-storage:/app/storage
     labels:
       glance.name: SAFLII Scraper
       glance.icon: mdi:scale-balance
       glance.description: Lädt südafrikanische Urteile für RE3 (pdf+html)
+
+volumes:
+  saflii-storage:

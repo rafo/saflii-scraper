@@ -35,16 +35,21 @@ Der Scraper läuft dauerhaft am besten auf dem NAS (Birdsnest, x86_64) —
 tagelange Crawls hängen dann nicht am Mac, und die Daten entstehen direkt
 auf dem NAS-Volume.
 
+Das Image wird von **GitHub Actions** gebaut (bei jedem Push auf `main`)
+und liegt öffentlich unter `ghcr.io/rafo/saflii-scraper:latest` — das NAS
+pullt es ohne Anmeldung. In Komodo genügt daher ein **UI-defined Stack**
+mit dem Inhalt der `compose.yaml` (nichts muss auf dem Server liegen).
+
 ```bash
-docker compose up -d --build   # oder: Stack in Komodo anlegen/deployen
 docker logs -f saflii-scraper
 ```
 
-- `compose.yaml` mountet `/data/Work/RE3_scraper_saflii_data` (NAS) nach
-  `/downloads` und setzt `SAFLII_DATA_DIR` entsprechend.
-- `./storage` (Crawlee-Queue) ist ebenfalls gemountet → nach Container-
-  Neustart wird fortgesetzt statt neu begonnen; zusätzlich überspringt der
-  Scraper ohnehin alle bereits vorhandenen Dateien.
+- `compose.yaml` mountet `/volume1/data/Work/RE3_scraper_saflii_data`
+  (NAS) nach `/downloads` und setzt `SAFLII_DATA_DIR` entsprechend —
+  Volume-Nummer in DSM prüfen.
+- Das benannte Volume `saflii-storage` hält die Crawlee-Queue → nach
+  Container-Neustart wird fortgesetzt statt neu begonnen; zusätzlich
+  überspringt der Scraper ohnehin alle bereits vorhandenen Dateien.
 - Der Container beendet sich nach vollständigem Durchlauf selbst
   (`restart: on-failure` startet nur Abstürze neu). Re-Scrape = Stack in
   Komodo neu deployen.
@@ -52,12 +57,11 @@ docker logs -f saflii-scraper
 
 **Entwicklungs-Workflow:** Entwickelt und getestet wird lokal auf dem Mac
 (dieses Repo, `uv run …` — die interaktiven Prompts funktionieren weiter).
-Deployment aufs NAS = Projektordner auf das docker-Share kopieren und den
-Stack in Komodo redeployen (baut das Image neu):
+Deployment:
 
 ```bash
-rsync -a --delete --exclude .venv --exclude storage --exclude saflii_data \
-  --exclude .git "$(pwd)/" /Volumes/docker/saflii-scraper/
+git push                      # GitHub Actions baut + pusht das Image
+# danach: Stack in Komodo redeployen (pullt :latest)
 ```
 
 **Warum `pdf,html` als Default:** Das PDF ist das Original-Gerichtsdokument
