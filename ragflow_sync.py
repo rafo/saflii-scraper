@@ -21,7 +21,7 @@ Usage:
 
 Example:
     uv run python ragflow_sync.py \\
-        "/Users/rafael/data/Work/RE3_scraper_saflii_data/pdf/za/cases/ZAWCHC" \\
+        "/Volumes/data/Work/RE3_scraper_saflii_data/pdf/za/cases/ZAWCHC" \\
         "SA Case Law ZAWCHC" --apply
 """
 

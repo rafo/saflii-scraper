@@ -27,7 +27,7 @@ Pipe) gelten automatisch Env-Wert bzw. Default:
 | `SAFLII_FILTER_COURT` | `FILTER_COURT` | Gerichtskürzel, z.B. `ZAWCHC` | alle Gerichte |
 | `SAFLII_FILTER_YEAR` | `FILTER_YEAR` | Jahr, z.B. `2024` | alle Jahre |
 | `SAFLII_FORMATS` | Format(e) | `html`, `pdf`, `rtf`, `all` oder Kombination wie `pdf,html` | `pdf,html` |
-| `SAFLII_DATA_DIR` | Zielverzeichnis | Ablageort der Downloads | `/Users/rafael/data/Work/RE3_scraper_saflii_data` |
+| `SAFLII_DATA_DIR` | Zielverzeichnis | Ablageort der Downloads | `/Volumes/data/Work/RE3_scraper_saflii_data` (NAS via SMB) |
 
 ### Betrieb als Docker-Container (NAS/Komodo)
 
@@ -144,7 +144,7 @@ Lokal ist die Quelle der Wahrheit.
 ```bash
 export RAGFLOW_API_KEY=ragflow-...    # RAGFlow-UI → Avatar → API → API-Key
 uv run python ragflow_sync.py \
-  "/Users/rafael/data/Work/RE3_scraper_saflii_data/pdf/za/cases/ZAWCHC" \
+  "/Volumes/data/Work/RE3_scraper_saflii_data/pdf/za/cases/ZAWCHC" \
   "SA Case Law ZAWCHC"                # Dry-Run
 # … Ausgabe prüfen, dann:
 uv run python ragflow_sync.py … --apply

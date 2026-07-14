@@ -34,8 +34,9 @@ VALID_FORMATS = ("html", "pdf", "rtf")
 # highlighting); HTML is the clean-text archive/fallback. RTF on request only.
 DEFAULT_FORMATS = "pdf,html"
 
-# Central collection point for all scraped data, mounted into RAGFlow from here.
-DEFAULT_DATA_DIR = "/Users/rafael/data/Work/RE3_scraper_saflii_data"
+# Central collection on the NAS (Birdsnest), as seen from the Mac via SMB.
+# The scraper container on the NAS overrides this with SAFLII_DATA_DIR.
+DEFAULT_DATA_DIR = "/Volumes/data/Work/RE3_scraper_saflii_data"
 
 
 @dataclass
