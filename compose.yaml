@@ -12,7 +12,12 @@ services:
     build: .
     container_name: saflii-scraper
     restart: on-failure
+    # NAS user — downloads land with sane ownership instead of root:
+    user: "1035:65538"
+    security_opt:
+      - no-new-privileges:true
     environment:
+      TZ: Europe/Berlin
       SAFLII_DATA_DIR: /downloads
       SAFLII_FORMATS: ${SAFLII_FORMATS:-pdf,html}
       # Leave empty to crawl all courts/years:
@@ -23,3 +28,7 @@ services:
       - /data/Work/RE3_scraper_saflii_data:/downloads
       # Crawlee request-queue state — survives container restarts (resume):
       - ./storage:/app/storage
+    labels:
+      glance.name: SAFLII Scraper
+      glance.icon: mdi:scale-balance
+      glance.description: Lädt südafrikanische Urteile für RE3 (pdf+html)

@@ -13,4 +13,6 @@ COPY saflii_processor_yearly.py saflii_utils.py reconcile.py ragflow_sync.py mai
 # Unbuffered so logs stream live into `docker logs`
 ENV PYTHONUNBUFFERED=1
 
-CMD ["uv", "run", "--frozen", "python", "saflii_processor_yearly.py"]
+# Run the venv python directly (no uv at runtime): works under any
+# `user:` mapping without needing a writable home/cache directory.
+CMD ["/app/.venv/bin/python", "saflii_processor_yearly.py"]
