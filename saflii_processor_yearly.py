@@ -4,8 +4,10 @@ import os
 import random
 import re
 import sys
+import time
+import urllib.request
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from crawlee import ConcurrencySettings, Request
 from crawlee.crawlers import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
@@ -37,6 +39,12 @@ DEFAULT_FORMATS = "pdf,html"
 # Central collection on the NAS (Birdsnest), as seen from the Mac via SMB.
 # The scraper container on the NAS overrides this with SAFLII_DATA_DIR.
 DEFAULT_DATA_DIR = "/Volumes/data/Work/RE3_scraper_saflii_data"
+
+# One logfile per run (like reconcile's per-run JSON logs), kept next to
+# the collection so it survives container redeploys. Old logs are removed
+# at startup after SAFLII_LOG_RETENTION_DAYS (0 disables the cleanup).
+DEFAULT_LOG_RETENTION_DAYS = 30
+LOG_FILE_PREFIX = "scrape_"
 
 
 @dataclass
@@ -125,6 +133,80 @@ def get_user_config() -> ScraperConfig:
     return ScraperConfig(filter_court, filter_year, download_format, data_dir)
 
 
+def setup_file_logging(data_dir):
+    """Write a per-run logfile to <data_dir>/logs (or SAFLII_LOG_DIR).
+
+    The file handler sits on the root logger so saflii_utils messages are
+    captured as well. Returns the logfile path, or None if the directory
+    cannot be created (console logging still works then).
+    """
+    log_dir = os.environ.get("SAFLII_LOG_DIR") or os.path.join(data_dir, "logs")
+    try:
+        os.makedirs(log_dir, exist_ok=True)
+    except OSError as e:
+        log.warning(f"Cannot create log directory {log_dir}, file logging disabled: {e}")
+        return None
+
+    log_path = os.path.join(
+        log_dir, f"{LOG_FILE_PREFIX}{datetime.now():%Y%m%d_%H%M%S}.log"
+    )
+    handler = logging.FileHandler(log_path, encoding="utf-8")
+    handler.setFormatter(
+        logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
+    )
+    logging.getLogger().addHandler(handler)
+
+    cleanup_old_logs(log_dir)
+    return log_path
+
+
+def cleanup_old_logs(log_dir):
+    """Delete this scraper's logfiles older than the retention period."""
+    try:
+        retention_days = int(
+            os.environ.get("SAFLII_LOG_RETENTION_DAYS", DEFAULT_LOG_RETENTION_DAYS)
+        )
+    except ValueError:
+        log.warning("Invalid SAFLII_LOG_RETENTION_DAYS, using default")
+        retention_days = DEFAULT_LOG_RETENTION_DAYS
+    if retention_days <= 0:
+        return
+
+    cutoff = time.time() - retention_days * 86400
+    for name in os.listdir(log_dir):
+        if not (name.startswith(LOG_FILE_PREFIX) and name.endswith(".log")):
+            continue
+        path = os.path.join(log_dir, name)
+        try:
+            if os.path.getmtime(path) < cutoff:
+                os.remove(path)
+                log.info(f"Deleted old logfile: {name}")
+        except OSError as e:
+            log.warning(f"Could not delete old logfile {name}: {e}")
+
+
+def notify_ntfy(message, priority="default"):
+    """Push a notification to the ntfy topic in SAFLII_NTFY_URL.
+
+    No-op when the variable is unset; never raises — a failed notification
+    must not take down or mask the actual scrape result.
+    """
+    url = os.environ.get("SAFLII_NTFY_URL")
+    if not url:
+        return
+    try:
+        request = urllib.request.Request(
+            url,
+            data=message.encode("utf-8"),
+            headers={"Title": "SAFLII Scraper", "Priority": priority},
+        )
+        with urllib.request.urlopen(request, timeout=15):
+            pass
+        log.info(f"ntfy notification sent to {url}")
+    except Exception as e:
+        log.warning(f"Could not send ntfy notification to {url}: {e}")
+
+
 def build_start_urls(config):
     """Start as deep in the site hierarchy as the filters allow.
 
@@ -180,6 +262,13 @@ async def download_and_save_file(url, http_client, filename_base, referer_url, b
 
 async def main():
     config = get_user_config()
+
+    log_path = setup_file_logging(config.data_dir)
+    log.info(
+        f"Scrape started: court={config.filter_court or 'all'}, "
+        f"year={config.filter_year or 'all'}, formats={config.formats}, "
+        f"data_dir={config.data_dir}, logfile={log_path}"
+    )
 
     # saflii.org blocks plain HTTP clients (403); impersonate a real browser
     http_client = CurlImpersonateHttpClient(
@@ -275,8 +364,28 @@ async def main():
                     f"{success_count}/{len(config.formats)} successful"
                 )
 
-    await crawler.run(build_start_urls(config))
+    stats = await crawler.run(build_start_urls(config))
+
+    # Explicit completion marker: crawlee's own loggers do not propagate to
+    # the root logger, so the statistics would otherwise never reach the file
+    log.info(
+        f"Scrape finished: {stats.requests_finished} requests finished, "
+        f"{stats.requests_failed} failed, runtime {stats.crawler_runtime}\n"
+        f"{stats.to_table()}"
+    )
+    notify_ntfy(
+        f"Scrape finished (court={config.filter_court or 'all'}, "
+        f"year={config.filter_year or 'all'}): "
+        f"{stats.requests_finished} requests, {stats.requests_failed} failed, "
+        f"runtime {stats.crawler_runtime}"
+    )
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        raise
+    except Exception as e:
+        notify_ntfy(f"Scrape CRASHED: {e!r}", priority="high")
+        raise
