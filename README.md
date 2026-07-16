@@ -30,7 +30,8 @@ Pipe) gelten automatisch Env-Wert bzw. Default:
 | `SAFLII_DATA_DIR` | Zielverzeichnis | Ablageort der Downloads | `/Volumes/data/Work/RE3_scraper_saflii_data` (NAS via SMB) |
 | `SAFLII_LOG_DIR` | — | Ablageort der Logfiles | `<SAFLII_DATA_DIR>/logs` |
 | `SAFLII_LOG_RETENTION_DAYS` | — | Logfiles älter als N Tage werden beim Start gelöscht (`0` = nie) | `30` |
-| `SAFLII_NTFY_URL` | — | ntfy-Topic-URL für Push-Benachrichtigungen, z.B. `https://ntfy.sh/<topic>` | aus (keine Benachrichtigung) |
+| `SAFLII_NTFY_URL` | — | ntfy-Topic-URL für Push-Benachrichtigungen; leer setzen (`SAFLII_NTFY_URL=`) schaltet sie ab | `http://ntfy:8080/scraper-saflii` (ntfy im Komodo-Netz auf dem NAS) |
+| `SAFLII_NTFY_TOKEN` | — | ntfy-Access-Token (wird als `Authorization: Bearer` mitgeschickt) | aus (kein Auth-Header) |
 
 Jeder Lauf schreibt zusätzlich zur Konsole ein eigenes Logfile
 (`logs/scrape_<zeitstempel>.log`, neben der Sammlung → überlebt
@@ -39,13 +40,18 @@ Abschluss-Statistik (Requests, Fehler, Laufzeit) und ist das
 „Fertig"-Signal, nach dem man greppen kann; alte Logs räumt der Scraper
 beim nächsten Start selbst ab.
 
-Ist `SAFLII_NTFY_URL` gesetzt, schickt der Scraper am Ende des Laufs eine
-Push-Benachrichtigung mit derselben Statistik an das [ntfy](https://ntfy.sh)-
-Topic (Handy-App abonniert das Topic, kein Account nötig); stirbt der Lauf
-mit einer Exception, kommt stattdessen eine `Scrape CRASHED`-Meldung mit
+Am Ende des Laufs schickt der Scraper eine Push-Benachrichtigung mit
+derselben Statistik an das [ntfy](https://ntfy.sh)-Topic aus
+`SAFLII_NTFY_URL` (Handy-App abonniert das Topic); stirbt der Lauf mit
+einer Exception, kommt stattdessen eine `Scrape CRASHED`-Meldung mit
 hoher Priorität. Eine fehlgeschlagene Benachrichtigung wird nur geloggt
-und beeinflusst den Lauf nicht. Für den Produktivbetrieb bietet sich eine
-selbst gehostete ntfy-Instanz auf dem NAS an (privates Topic).
+und beeinflusst den Lauf nicht. Produktiv zeigt der Default auf die
+selbst gehostete ntfy-Instanz im Komodo-Stack auf dem NAS (der
+Scraper-Container läuft dafür im `network_mode: komodo_default`);
+verlangt die Instanz Auth, das Access-Token per `SAFLII_NTFY_TOKEN`
+mitgeben. Lokal auf dem Mac ist der ntfy-Host nicht erreichbar — die
+Benachrichtigung schlägt dann still fehl (nur Log-Warnung), oder man
+setzt `SAFLII_NTFY_URL=` bzw. eine eigene Topic-URL.
 
 ### Betrieb als Docker-Container (NAS/Komodo)
 

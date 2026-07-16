@@ -188,17 +188,22 @@ def cleanup_old_logs(log_dir):
 def notify_ntfy(message, priority="default"):
     """Push a notification to the ntfy topic in SAFLII_NTFY_URL.
 
-    No-op when the variable is unset; never raises — a failed notification
-    must not take down or mask the actual scrape result.
+    Default ist die ntfy-Instanz im Komodo-Netz auf dem NAS; leerer Wert
+    (`SAFLII_NTFY_URL=`) schaltet Benachrichtigungen ab. Never raises — a
+    failed notification must not take down or mask the actual scrape result.
     """
-    url = os.environ.get("SAFLII_NTFY_URL")
+    url = os.environ.get("SAFLII_NTFY_URL", "http://ntfy:8080/scraper-saflii")
     if not url:
         return
+    headers = {"Title": "SAFLII Scraper", "Priority": priority}
+    token = os.environ.get("SAFLII_NTFY_TOKEN")
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
     try:
         request = urllib.request.Request(
             url,
             data=message.encode("utf-8"),
-            headers={"Title": "SAFLII Scraper", "Priority": priority},
+            headers=headers,
         )
         with urllib.request.urlopen(request, timeout=15):
             pass
