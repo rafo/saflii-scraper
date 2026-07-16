@@ -55,14 +55,15 @@ auf dem NAS-Volume.
 
 Das Image wird von **GitHub Actions** gebaut (bei jedem Push auf `main`)
 und liegt öffentlich unter `ghcr.io/rafo/saflii-scraper:latest` — das NAS
-pullt es ohne Anmeldung. In Komodo genügt daher ein **UI-defined Stack**
-mit dem Inhalt der `compose.yaml` (nichts muss auf dem Server liegen).
+pullt es ohne Anmeldung. In Komodo läuft er als **UI-defined Stack**; der
+Compose-Inhalt liegt direkt in der Komodo-UI, nicht im Repo (nichts muss
+auf dem Server liegen).
 
 ```bash
 docker logs -f saflii-scraper
 ```
 
-- `compose.yaml` mountet `/volume1/data/Work/RE3_scraper_saflii_data`
+- Der Stack mountet `/volume1/data/Work/RE3_scraper_saflii_data`
   (NAS) nach `/downloads` und setzt `SAFLII_DATA_DIR` entsprechend —
   Volume-Nummer in DSM prüfen.
 - Das benannte Volume `saflii-storage` hält die Crawlee-Queue → nach

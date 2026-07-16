@@ -1,109 +1,90 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Anleitung für Claude Code in diesem Repository.
 
-## Project Overview
+## Kontext
 
-This is a Python web scraper for the South African Legal Information Institute (Saflii) database at https://www.saflii.org/. The scraper extracts legal documents, court cases, journals, gazettes, and rolls from South African courts and legal institutions.
+SAFLII-Scraper für RE3: lädt südafrikanische Gerichtsurteile von saflii.org
+als Datengrundlage für die RAGFlow-Instanz (lokal auf Rafaels Mac, später
+Kunden-Server). **Das README.md ist die maßgebliche Doku** für Benutzung,
+Env-Variablen, Datenablage und den Update-Workflow (Scrape → Reconcile →
+Sync) — dort nachlesen und bei Änderungen mitpflegen, hier nicht duplizieren.
 
-## Commands
+Zugehörige Orte außerhalb dieses Repos:
 
-### Development Setup
+- RAGFlow-Betrieb/Branding: `/Users/rafael/docker/ragflow` (eigene
+  Claude-Session dort starten, wenn es um RAGFlow selbst geht)
+- RE3-Planung/Notizen (Obsidian): `/Users/rafael/data/Work/RE3/`
+  (`RE3.AI.md`, `RE3 Deployment Plan.md`, `ToDo.md`)
+- Scrape-Sammlung: NAS `/volume1/data/Work/RE3_scraper_saflii_data`,
+  vom Mac aus als SMB-Mount `/Volumes/data/Work/RE3_scraper_saflii_data`
+
+## Git-Remotes (Achtung)
+
+- `ghfork` = https://github.com/rafo/saflii-scraper — **das aktive Remote**,
+  `main` trackt es, hierhin pushen. Push auf `main` triggert den
+  GitHub-Actions-Build (amd64-Image → `ghcr.io/rafo/saflii-scraper:latest`).
+- `origin` = iTeamGo/saflii — **veraltetes Team-Repo, nicht pushen.**
+
+## Deployment
+
+Produktiv läuft der Scraper als Container auf dem NAS „Birdsnest" (x86_64),
+verwaltet als UI-defined Stack in Komodo (Compose-Inhalt liegt in der
+Komodo-UI, nicht im Repo). Ablauf: `git push` → Actions baut das Image →
+Stack in Komodo redeployen (pullt `:latest`). Details im README.
+
+## Code-Landkarte
+
+- `saflii_processor_yearly.py` — der Voll-Crawler (produktiv genutzt)
+- `main.py` — gezielter Test-Crawl, Konstanten im Code
+- `saflii_utils.py` — gemeinsame Helfer (URL-Parsing, Dateinamen, Pfade);
+  einzige Quelle für diese Logik, von beiden Crawlern genutzt
+- `reconcile.py` — Duplikat-Auflösung nach Titelkorrekturen
+  (Schlüssel: neutrale Zitierung, neueste Datei gewinnt)
+- `ragflow_sync.py` — Abgleich lokaler PDF-Ordner ↔ RAGFlow-Dataset
+  (ragflow-sdk; braucht `RAGFLOW_API_KEY`, Default-URL `http://127.0.0.1`)
+- `saflii_processor_yearly_ori.py` — eingefrorener Originalstand, nicht
+  weiterentwickeln
+- `docker-compose.yml` — Altlast aus der Kotaemon-Evaluierung, gehört nicht
+  zum Scraper (das Produktiv-Compose liegt in Komodo)
+
+## Harte Randbedingungen (nicht „optimieren")
+
+- **Rate-Limit:** saflii.org blockt ab ~25 Anfragen/Minute mit 429 und
+  sperrt dann die IP. Concurrency/Rate im Crawler nicht erhöhen.
+- **403-Schutz:** Nur mit `CurlImpersonateHttpClient(impersonate="chrome")`
+  kommt man durch; PDF/RTF brauchen zusätzlich einen `Referer`-Header.
+- **Dateinamen sind API:** Voller SAFLII-Titel als Dateiname (RAGFlow zeigt
+  ihn Anwälten als Quelle); die neutrale Zitierung (z. B. `[2024] ZAWCHC 147`)
+  ist der stabile Schlüssel für reconcile/sync — Kürzungslogik bei Überlänge
+  erhält Zitierung + Datum immer. Änderungen an `generate_filename_from_title`
+  /`sanitize_filename` gefährden den gesamten Abgleich-Workflow.
+- **Ablage-Layout** `<base>/<format>/<land>/<kategorie>/<gericht>/<jahr>/`
+  ist mit den RAGFlow-Datasets verzahnt (Datasets binden Ordner aus dem
+  `pdf/`-Baum ein) — nicht umstrukturieren, ohne den Sync mitzudenken.
+
+## Bekannte Lücken / geplante Arbeiten
+
+- Crawler erfasst nur `cases`; Journals, Gazettes, Rolls haben eigene
+  URL-Strukturen → separates Vorhaben.
+- Inhaltsänderungen ohne Titeländerung werden nicht erkannt
+  (Skip-Logik ist rein dateinamensbasiert).
+- Periodischer Re-Scrape + Reconcile + Sync soll als Cron laufen
+  (SAFLII korrigiert Titel nachträglich); bisher manuell.
+- Stand Juli 2026: Erster Voll-Scrape (alle Courts, pdf+html) am
+  14.07.2026 auf dem NAS gestartet, Laufzeit mehrere Tage.
+
+## Entwicklung
+
 ```bash
-# Install dependencies using uv (Python package manager)
-uv sync
+uv sync                                    # Python 3.13 + Dependencies
+uv run python saflii_processor_yearly.py   # interaktive Prompts lokal
+uv run python reconcile.py                 # Dry-Run
+uv run python ragflow_sync.py <pdf-Ordner> <Dataset>   # Dry-Run
 ```
 
-### Running the Scrapers
-```bash
-# Run the main targeted scraper (specific court/year range)
-python main.py
-
-# Run the comprehensive yearly processor (all courts and years)
-python saflii_processor_yearly.py
-```
-
-### Docker Development
-```bash
-# Start the kotaemon service (document analysis platform)
-docker-compose up -d
-```
-
-## Architecture
-
-### Core Components
-
-1. **main.py** - Primary scraper targeting a specific court/year
-   - Uses `BeautifulSoupCrawler` directly
-   - Starts at the year index page and enqueues the actual document links
-   - Rate-limited via `ConcurrencySettings` (max 3 parallel, 60 requests/minute)
-
-2. **saflii_processor_yearly.py** - Comprehensive hierarchical scraper
-   - Follows the complete Saflii site structure:
-     1. Starts at databases.html (institution list)
-     2. Navigates to court/institution pages
-     3. Follows year links for each court
-     4. Downloads individual case documents (HTML, PDF, RTF, or all)
-   - Interactive startup prompts for court filter, year filter, and download format
-     (collected into a `ScraperConfig` dataclass)
-
-3. **saflii_utils.py** - Shared utility functions (single source of truth, used by both scrapers)
-   - `parse_saflii_url()` - Extracts metadata (country, court, year, case number, format) from URLs
-   - `generate_filename_from_title()` / `sanitize_filename()` - Create safe, length-capped filenames from HTML titles
-   - `build_file_path()` - Computes the target path (used to skip downloads for existing files)
-   - `save_file()` / `process_saflii_page()` - Save documents with proper directory structure
-
-### Data Structure
-
-Documents are saved in a hierarchical structure:
-```
-saflii_data/
-├── za/              # Country code (South Africa)
-│   └── ZAWCHC/      # Court code
-│       └── 2024/    # Year
-│           ├── [Case Title 1].html
-│           └── [Case Title 2].html
-```
-
-### Key Dependencies
-
-- **Crawlee** - Web crawling framework with BeautifulSoup integration
-- **BeautifulSoup4** - HTML parsing and processing
-
-### URL Pattern Recognition
-
-The scraper handles these URL patterns:
-- Database index: `https://www.saflii.org/content/databases.html`
-- Court pages: `https://www.saflii.org/za/cases/{COURT_CODE}/`
-- Year pages: `https://www.saflii.org/za/cases/{COURT_CODE}/{YEAR}/`
-- Documents: `https://www.saflii.org/za/cases/{COURT_CODE}/{YEAR}/{NUMBER}.html`
-
-### Anti-Blocking
-
-- saflii.org returns 403 for plain HTTP clients (curl, httpx); both scrapers therefore use
-  `CurlImpersonateHttpClient(impersonate="chrome")` for browser-like TLS fingerprints
-- PDF/RTF downloads additionally require a `Referer` header (the document's HTML URL),
-  otherwise the server responds with 403
-
-### Error Handling
-
-- HTTP errors (4xx/5xx) are logged with warnings
-- Missing HTML content is handled gracefully
-- File system operations include proper exception handling
-- Existing files are skipped to avoid duplication
-- Partial writes are cleaned up on failure
-
-### Configuration
-
-`saflii_processor_yearly.py` asks interactively at startup (see `get_user_config()`):
-- Court filter (e.g., "ZAWCHC", exact match) - empty for all courts
-- Year filter (e.g., "2024", exact match) - empty for all years
-- Download format: html, pdf, rtf, or all
-
-Constants:
-- `BASE_DATA_DIR` in `saflii_utils.py` - Output directory ("saflii_data", shared by both scrapers)
-- `MAX_REQUESTS_PER_CRAWL` in `saflii_processor_yearly.py` - Safety limit (100,000)
-
-In `main.py`:
-- `COUNTRY_CODE`, `COURT_CODE`, `YEAR` - Target parameters
-- `MAX_REQUESTS_PER_CRAWL` - Request limit (2000)
+- Immer erst Dry-Run prüfen, dann `--apply` (gilt für reconcile und sync).
+- Kleine Test-Crawls über `SAFLII_FILTER_COURT`/`SAFLII_FILTER_YEAR`
+  eingrenzen, nie ungefiltert „kurz testen" (Rate-Limit, tagelange Läufe).
+- Kein Test-Framework im Repo; Verifikation läuft über Dry-Runs und
+  gezielte Mini-Crawls.
