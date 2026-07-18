@@ -8,7 +8,7 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev
 
-COPY saflii_processor_yearly.py saflii_utils.py reconcile.py ragflow_sync.py main.py ./
+COPY saflii_processor_yearly.py saflii_utils.py reconcile.py ragflow_sync.py rules_collector.py main.py ./
 
 # Crawlee state dir — world-writable so the container runs under any
 # `user:` mapping; a named volume inherits these permissions on first use.

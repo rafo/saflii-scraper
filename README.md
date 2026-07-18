@@ -103,6 +103,52 @@ Crawlt ein fest im Code eingestelltes Gericht/Jahr (Konstanten anpassen):
 uv run python main.py
 ```
 
+### Court Rules & Practice Directives: `rules_collector.py`
+
+Sammelt einmalig/gelegentlich die Verfahrensregeln als PDFs ein — kein
+Dauer-Scraper (überschaubares, selten geändertes Korpus):
+
+- justice.gov.za `legislation/rules/rules.htm`: konsolidierte Court Rules
+  (Uniform Rules, SCA, Magistrates', Labour Court, …)
+- judiciary.org.za `judiciary/directives/…`: Practice Directives je
+  Gericht/Division (Sektionen werden aus dem Seitenmenü entdeckt)
+- Bar Association (Sektion `bar-association`): Practice Manuals je
+  Division plus weitere Court Rules (ConCourt, Competition Appeal Court,
+  Admiralty, …) — **via Wayback Machine**: Die alte Website
+  nationalbar.co.za hat ihren `/pdfs/`-Baum beim Wix-Relaunch
+  (rsabar.net) verloren; die Archiv-Captures sind die einzigen noch
+  erreichbaren Kopien. Der Sammler fragt die CDX-API ab und lädt je
+  Datei den neuesten Capture — tauchen neuere Captures auf, kommen sie
+  automatisch mit. Urheberrecht der Practice Manuals ist unklar
+  (Redaktionsleistung der Bar, keine amtlichen Texte) — Aufnahme ist
+  bewusste Entscheidung (Rafael, Juli 2026).
+
+```bash
+uv run python rules_collector.py                        # Dry-Run, alle Sektionen
+uv run python rules_collector.py --section western-cape # Sektions-Filter (Substring)
+uv run python rules_collector.py --apply                # lädt herunter
+```
+
+Ablage im selben Sammlungs-Baum als eigene Kategorie:
+`<Zielverzeichnis>/pdf/za/rules/<Sektion>/<Titel> [<URL-Hash>].pdf`
+(z.B. `rules/high-court-of-south-africa/western-cape-division-of-the-high-court/…`).
+Der 8-stellige URL-Hash im Namen hält Dateien eindeutig — Directive-Titel
+wiederholen sich auf den Listenseiten fast wörtlich. Zielverzeichnis via
+`--data-dir` oder `SAFLII_DATA_DIR` (Default: NAS-Mount). Vorhandene
+Dateien werden übersprungen; tote Links (kommen auf justice.gov.za vor)
+und Nicht-PDF-Antworten (Soft-404s) werden geloggt und brechen den Lauf
+nicht ab. Für RAGFlow bietet sich ein eigenes Dataset „Rules &
+Directives" auf dem `rules/`-Ordner an (`ragflow_sync.py` funktioniert
+unverändert damit).
+
+Das Skript ist im Docker-Image enthalten und läuft auf dem NAS im
+laufenden Scraper-Container:
+
+```bash
+docker exec -it <scraper-container> /app/.venv/bin/python rules_collector.py          # Dry-Run
+docker exec -it <scraper-container> /app/.venv/bin/python rules_collector.py --apply
+```
+
 ## Datenablage
 
 ```

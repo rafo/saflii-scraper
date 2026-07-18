@@ -39,6 +39,10 @@ Stack in Komodo redeployen (pullt `:latest`). Details im README.
 - `main.py` — gezielter Test-Crawl, Konstanten im Code
 - `saflii_utils.py` — gemeinsame Helfer (URL-Parsing, Dateinamen, Pfade);
   einzige Quelle für diese Logik, von beiden Crawlern genutzt
+- `rules_collector.py` — Einsammel-Skript für Court Rules & Practice
+  Directives (justice.gov.za, judiciary.org.za, Bar-Association-Manuals
+  via Wayback Machine); erster Nicht-SAFLII-Sammler, gelegentlicher
+  manueller Lauf statt Dauer-Scraper
 - `reconcile.py` — Duplikat-Auflösung nach Titelkorrekturen
   (Schlüssel: neutrale Zitierung, neueste Datei gewinnt)
 - `ragflow_sync.py` — Abgleich lokaler PDF-Ordner ↔ RAGFlow-Dataset
