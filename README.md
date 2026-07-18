@@ -38,7 +38,10 @@ Jeder Lauf schreibt zusätzlich zur Konsole ein eigenes Logfile
 Container-Redeploys). Die letzte Zeile `Scrape finished: …` enthält die
 Abschluss-Statistik (Requests, Fehler, Laufzeit) und ist das
 „Fertig"-Signal, nach dem man greppen kann; alte Logs räumt der Scraper
-beim nächsten Start selbst ab.
+beim nächsten Start selbst ab. Zusätzlich schreibt jeder Lauf eine
+`README.md` in die Wurzel des Sammlungsordners (Quelle, letzter Lauf,
+Ergebnis) — so ist auch beim händischen Stöbern auf dem NAS erkennbar,
+woher und von wann der Bestand ist.
 
 Am Ende des Laufs schickt der Scraper eine Push-Benachrichtigung mit
 derselben Statistik an das [ntfy](https://ntfy.sh)-Topic aus
@@ -149,6 +152,12 @@ URL; erst wenn auch das scheitert, zählt die Datei als Fehlschlag —
 geloggt, ohne den Lauf abzubrechen. Für RAGFlow bietet sich ein eigenes Dataset „Rules &
 Directives" auf dem `rules/`-Ordner an (`ragflow_sync.py` funktioniert
 unverändert damit).
+
+Jeder `--apply`-Lauf schreibt eine `README.md` in die Wurzel des
+Sammlungsordners (Quellen je Sektion, letzter Lauf, Ergebnis, Dateizahl
+pro Sektion) — bewusst **nicht** in die `pdf/`-Sektions-Ordner, weil
+RAGFlow-Datasets diese einbinden und die README sonst als Dokument
+ingestieren würden.
 
 Das Skript ist im Docker-Image enthalten und läuft auf dem NAS im
 laufenden Scraper-Container:

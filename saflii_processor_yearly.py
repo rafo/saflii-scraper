@@ -212,6 +212,38 @@ def notify_ntfy(message, priority="default"):
         log.warning(f"Could not send ntfy notification to {url}: {e}")
 
 
+def write_collection_readme(config, stats):
+    """Self-describing marker at the collection root: source + last run.
+
+    Lets anyone browsing the NAS see where and when the files came from
+    without opening the repo. Overwritten each run (history is in logs/);
+    never raises — a failed marker must not mask the scrape result.
+    """
+    path = os.path.join(config.data_dir, "README.md")
+    content = (
+        "# RE3-Sammlung: SAFLII (südafrikanische Rechtsprechung)\n\n"
+        "Automatisch erzeugt vom SAFLII-Scraper "
+        "(Repo `saflii-scraper`) — nicht von Hand bearbeiten, wird nach "
+        "jedem Lauf überschrieben.\n\n"
+        "- Quelle: https://www.saflii.org (Kategorie `cases`)\n"
+        "- Ablage: `<format>/<land>/<kategorie>/<gericht>/<jahr>/"
+        "<Urteilstitel>.<format>`\n"
+        f"- Letzter Lauf: {datetime.now():%Y-%m-%d %H:%M} "
+        f"(court={config.filter_court or 'alle'}, "
+        f"year={config.filter_year or 'alle'}, "
+        f"Formate {','.join(config.formats)})\n"
+        f"- Ergebnis: {stats.requests_finished} Requests, "
+        f"{stats.requests_failed} Fehler, Laufzeit {stats.crawler_runtime}\n"
+        "- Lauf-Historie: siehe `logs/`\n"
+    )
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(content)
+        log.info(f"Collection README updated: {path}")
+    except OSError as e:
+        log.warning(f"Could not write collection README {path}: {e}")
+
+
 def build_start_urls(config):
     """Start as deep in the site hierarchy as the filters allow.
 
@@ -384,6 +416,7 @@ async def main():
         f"{stats.requests_finished} requests, {stats.requests_failed} failed, "
         f"runtime {stats.crawler_runtime}"
     )
+    write_collection_readme(config, stats)
 
 
 if __name__ == "__main__":

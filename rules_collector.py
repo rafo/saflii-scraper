@@ -41,6 +41,7 @@ import re
 import sys
 import time
 import urllib.parse
+from datetime import datetime
 
 from bs4 import BeautifulSoup
 from curl_cffi import requests
@@ -232,6 +233,60 @@ def target_path(base_dir, section, url, title):
     return os.path.join(base_dir, "pdf", "za", "rules", section, filename_for(url, title))
 
 
+def write_collection_readme(base_dir, documents, downloaded, failed, existing, section_filter=None):
+    """Self-describing marker at the collection root: sources + last run.
+
+    Lets anyone browsing the NAS see where and when the files came from.
+    Deliberately NOT inside pdf/za/rules/ — RAGFlow datasets bind those
+    folders and would ingest the README as a document. Overwritten on
+    each --apply run; never raises.
+    """
+    per_section = {}
+    for section, _, _ in documents.values():
+        per_section[section] = per_section.get(section, 0) + 1
+    section_lines = "".join(
+        f"| `{section}` | {count} |\n" for section, count in sorted(per_section.items())
+    )
+    path = os.path.join(base_dir, "README.md")
+    content = (
+        "# RE3-Sammlung: Court Rules & Practice Directives\n\n"
+        "Automatisch erzeugt von `rules_collector.py` "
+        "(Repo `saflii-scraper`) — nicht von Hand bearbeiten, wird nach "
+        "jedem `--apply`-Lauf überschrieben.\n\n"
+        "Quellen (Sektion unter `pdf/za/rules/` → Herkunft):\n\n"
+        "- `consolidated-rules/` — justice.gov.za/legislation/rules/rules.htm "
+        "(konsolidierte Court Rules)\n"
+        "- `rules-and-practice-directions/` — judiciary.org.za, "
+        "Übersichtsseite „Rules and Practice Directions“\n"
+        "- Gerichts-Sektionen (`high-court-of-south-africa/…`, "
+        "`districts-courts/…`, `supreme-court-of-appeal/`, …) — "
+        "judiciary.org.za, Practice Directives je Gericht/Division\n"
+        "- `bar-association/` — nationalbar.co.za/pdfs/ via Wayback Machine "
+        "(die Website hat den Bestand beim Wix-Relaunch verloren; je Datei "
+        "der neueste Archiv-Capture)\n\n"
+        "Tote Live-Links werden automatisch über den neuesten "
+        "Wayback-Machine-Capture geladen.\n\n"
+        f"Letzter Lauf: {datetime.now():%Y-%m-%d %H:%M}"
+        + (
+            f" — **gefilterter Lauf** (`--section {section_filter}`), "
+            "Zahlen unten betreffen nur diese Teilmenge"
+            if section_filter
+            else ""
+        )
+        + "\n\n"
+        f"Ergebnis: {len(documents)} Dokumente erfasst, {downloaded} neu "
+        f"geladen, {existing} übersprungen (vorhanden), {failed} "
+        "fehlgeschlagen.\n\n"
+        f"| Sektion | Dateien |\n|---|---|\n{section_lines}"
+    )
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(content)
+        log.info(f"Collection README updated: {path}")
+    except OSError as e:
+        log.warning(f"Could not write collection README {path}: {e}")
+
+
 def download(session, url, referer, path):
     time.sleep(REQUEST_DELAY_SECONDS)
     response = session.get(url, headers={"Referer": referer}, timeout=120)
@@ -306,6 +361,10 @@ def main():
     log.info(
         f"Done: {len(new) - len(failed)} downloaded, {len(failed)} failed, "
         f"{len(existing)} skipped (already present)"
+    )
+    write_collection_readme(
+        args.data_dir, documents, len(new) - len(failed), len(failed),
+        len(existing), args.section,
     )
     if failed:
         sys.exit(1)
