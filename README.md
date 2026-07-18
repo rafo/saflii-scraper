@@ -74,14 +74,43 @@ docker logs -f saflii-scraper
 
 - Der Stack mountet `/volume1/data/Work/RE3_scraper_saflii_data`
   (NAS) nach `/downloads` und setzt `SAFLII_DATA_DIR` entsprechend —
-  Volume-Nummer in DSM prüfen.
+  Volume-Nummer in DSM prüfen. Für den Rules-Collector zusätzlich
+  `RE3_scraper_rules_data` mounten und `RULES_DATA_DIR` setzen.
 - Das benannte Volume `saflii-storage` hält die Crawlee-Queue → nach
   Container-Neustart wird fortgesetzt statt neu begonnen; zusätzlich
   überspringt der Scraper ohnehin alle bereits vorhandenen Dateien.
-- Der Container beendet sich nach vollständigem Durchlauf selbst
-  (`restart: on-failure` startet nur Abstürze neu). Re-Scrape = Stack in
-  Komodo neu deployen.
 - Filter per Env im Stack setzen, z.B. `SAFLII_FILTER_COURT=ZAWCHC`.
+
+**Zeitplan im Container (`scheduler.py`):** Der Container startet
+standardmäßig einen internen Scheduler statt eines Einmal-Scrapes —
+bewusst unabhängig vom Host (kein Synology-Aufgabenplaner, kein
+Host-Cron), damit der Stack unverändert auf jeden späteren Server
+umziehen kann. Der Container läuft dauerhaft (`restart: unless-stopped`
+o.ä. sinnvoll) und stößt die Jobs sequenziell an, sobald ihr Intervall
+abgelaufen ist:
+
+| Job | Intervall-Env | Default | Inhalt |
+|---|---|---|---|
+| `saflii-scrape` | `SAFLII_SCRAPE_INTERVAL_DAYS` | `7` | Voll-Re-Scrape, danach automatisch `reconcile.py --apply` |
+| `rules-collect` | `RULES_INTERVAL_DAYS` | `30` | `rules_collector.py --apply` |
+
+`0` deaktiviert einen Job. Die Zeitstempel der letzten Läufe liegen in
+`SCHEDULER_STATE_FILE` (Default `<SAFLII_DATA_DIR>/logs/scheduler_state.json`,
+also auf dem Daten-Volume) — Redeploys setzen die Uhr **nicht** zurück,
+und beim allerersten Start gilt „gerade gelaufen", damit ein Deploy nie
+überraschend einen tagelangen Voll-Scrape auslöst. Sofortiger manueller
+Lauf jederzeit per:
+
+```bash
+docker exec <container> /app/.venv/bin/python saflii_processor_yearly.py
+docker exec <container> /app/.venv/bin/python rules_collector.py --apply
+```
+
+`ragflow_sync` ist **nicht** im Zeitplan: RAGFlow läuft derzeit auf dem
+Mac und ist vom NAS-Container aus nicht erreichbar — der Sync bleibt der
+manuelle Abschluss des Workflows (siehe unten). Ein einmaliger
+Scrape-Lauf ohne Scheduler geht weiterhin per Command-Override im
+Compose (`command: /app/.venv/bin/python saflii_processor_yearly.py`).
 
 **Entwicklungs-Workflow:** Entwickelt und getestet wird lokal auf dem Mac
 (dieses Repo, `uv run …` — die interaktiven Prompts funktionieren weiter).

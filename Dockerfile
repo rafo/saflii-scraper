@@ -8,7 +8,7 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev
 
-COPY saflii_processor_yearly.py saflii_utils.py reconcile.py ragflow_sync.py rules_collector.py main.py ./
+COPY saflii_processor_yearly.py saflii_utils.py reconcile.py ragflow_sync.py rules_collector.py scheduler.py main.py ./
 
 # Crawlee state dir — world-writable so the container runs under any
 # `user:` mapping; a named volume inherits these permissions on first use.
@@ -19,4 +19,6 @@ ENV PYTHONUNBUFFERED=1
 
 # Run the venv python directly (no uv at runtime): works under any
 # `user:` mapping without needing a writable home/cache directory.
-CMD ["/app/.venv/bin/python", "saflii_processor_yearly.py"]
+# Default is the in-container scheduler (periodic scrape jobs); override
+# the command for a one-shot run of an individual script.
+CMD ["/app/.venv/bin/python", "scheduler.py"]

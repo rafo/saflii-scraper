@@ -38,6 +38,9 @@ Stack in Komodo redeployen (pullt `:latest`). Details im README.
 ## Code-Landkarte
 
 - `saflii_processor_yearly.py` — der Voll-Crawler (produktiv genutzt)
+- `scheduler.py` — Container-Hauptprozess (Default-CMD): stößt die Jobs
+  periodisch an (Scrape+Reconcile wöchentlich, Rules monatlich; Envs im
+  README); bewusst host-unabhängig (kein Synology-Cron)
 - `main.py` — gezielter Test-Crawl, Konstanten im Code
 - `saflii_utils.py` — gemeinsame Helfer (URL-Parsing, Dateinamen, Pfade);
   einzige Quelle für diese Logik, von beiden Crawlern genutzt
@@ -75,8 +78,9 @@ Stack in Komodo redeployen (pullt `:latest`). Details im README.
   URL-Strukturen → separates Vorhaben.
 - Inhaltsänderungen ohne Titeländerung werden nicht erkannt
   (Skip-Logik ist rein dateinamensbasiert).
-- Periodischer Re-Scrape + Reconcile + Sync soll als Cron laufen
-  (SAFLII korrigiert Titel nachträglich); bisher manuell.
+- Periodischer Re-Scrape + Reconcile läuft seit Juli 2026 über
+  `scheduler.py` im Container; der RAGFlow-Sync bleibt manuell, bis
+  RAGFlow vom Container aus erreichbar ist (läuft derzeit auf dem Mac).
 - Stand Juli 2026: Erster Voll-Scrape (alle Courts, pdf+html) am
   14.07.2026 auf dem NAS gestartet, Laufzeit mehrere Tage.
 
