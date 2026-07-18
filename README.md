@@ -135,9 +135,12 @@ Ablage im selben Sammlungs-Baum als eigene Kategorie:
 Der 8-stellige URL-Hash im Namen hält Dateien eindeutig — Directive-Titel
 wiederholen sich auf den Listenseiten fast wörtlich. Zielverzeichnis via
 `--data-dir` oder `SAFLII_DATA_DIR` (Default: NAS-Mount). Vorhandene
-Dateien werden übersprungen; tote Links (kommen auf justice.gov.za vor)
-und Nicht-PDF-Antworten (Soft-404s) werden geloggt und brechen den Lauf
-nicht ab. Für RAGFlow bietet sich ein eigenes Dataset „Rules &
+Dateien werden übersprungen; Nicht-PDF-Antworten (Soft-404s) werden
+verworfen statt gespeichert. Scheitert ein Live-Download (tote Links
+kommen auf justice.gov.za und judiciary.org.za regelmäßig vor), versucht
+der Sammler automatisch den neuesten Wayback-Machine-Capture derselben
+URL; erst wenn auch das scheitert, zählt die Datei als Fehlschlag —
+geloggt, ohne den Lauf abzubrechen. Für RAGFlow bietet sich ein eigenes Dataset „Rules &
 Directives" auf dem `rules/`-Ordner an (`ragflow_sync.py` funktioniert
 unverändert damit).
 

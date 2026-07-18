@@ -69,10 +69,9 @@ SEED_SECTION = "rules-and-practice-directions"
 # (editorial work of the Bar, not official texts) — inclusion is a
 # deliberate decision by Rafael, 2026-07-18.
 BAR_SECTION = "bar-association"
-CDX_API_URL = (
+CDX_API_BASE = (
     "https://web.archive.org/cdx/search/cdx"
-    "?url=nationalbar.co.za/pdfs/*&output=json&fl=urlkey,timestamp,original"
-    "&filter=statuscode:200&filter=mimetype:application/pdf"
+    "?output=json&fl=urlkey,timestamp,original&filter=statuscode:200"
 )
 WAYBACK_RAW_URL = "https://web.archive.org/web/{timestamp}id_/{original}"
 
@@ -129,6 +128,37 @@ def filename_for(url, title):
     return f"{head}{suffix}.pdf"
 
 
+def cdx_query(session, url_pattern, extra_filter=None):
+    """Wayback CDX rows [urlkey, timestamp, original] for a URL (pattern)."""
+    time.sleep(REQUEST_DELAY_SECONDS)
+    query = f"{CDX_API_BASE}&url={urllib.parse.quote(url_pattern, safe='')}"
+    if extra_filter:
+        query += f"&filter={extra_filter}"
+    response = session.get(query, timeout=60)
+    response.raise_for_status()
+    rows = response.json()
+    return rows[1:]  # row 0 is the header
+
+
+def wayback_fallback_url(session, url):
+    """Raw-download URL of the newest archived capture, or None.
+
+    Rescue path for link rot on the live sites (justice.gov.za and
+    judiciary.org.za both list PDFs that 404). No mimetype filter — some
+    captures are stored as octet-stream; the %PDF check in download()
+    guards against archived HTML error pages.
+    """
+    try:
+        rows = cdx_query(session, url)
+    except Exception as e:
+        log.warning(f"CDX lookup failed for {url}: {e}")
+        return None
+    if not rows:
+        return None
+    _, timestamp, original = max(rows, key=lambda row: row[1])
+    return WAYBACK_RAW_URL.format(timestamp=timestamp, original=original)
+
+
 def collect_bar_documents(session):
     """Bar Association PDFs from the Wayback Machine, newest capture each.
 
@@ -136,12 +166,11 @@ def collect_bar_documents(session):
     stable SURT urlkey (filename hash input), the download URL points at
     the raw capture (`id_` suffix = original bytes, no archive banner).
     """
-    time.sleep(REQUEST_DELAY_SECONDS)
-    response = session.get(CDX_API_URL, timeout=60)
-    response.raise_for_status()
-    rows = response.json()
+    rows = cdx_query(
+        session, "nationalbar.co.za/pdfs/*", "mimetype:application/pdf"
+    )
     newest = {}
-    for urlkey, timestamp, original in rows[1:]:  # row 0 is the header
+    for urlkey, timestamp, original in rows:
         if urlkey not in newest or timestamp > newest[urlkey][0]:
             newest[urlkey] = (timestamp, original)
     documents = {}
@@ -260,8 +289,19 @@ def main():
         try:
             download(session, download_url, referer, path)
         except Exception as e:
-            log.error(f"Download failed for {download_url}: {e}")
-            failed.append(download_url)
+            rescued = False
+            if "web.archive.org" not in download_url:
+                fallback = wayback_fallback_url(session, download_url)
+                if fallback:
+                    log.info(f"Live download failed ({e}), retrying from Wayback: {fallback}")
+                    try:
+                        download(session, fallback, referer, path)
+                        rescued = True
+                    except Exception as fallback_error:
+                        e = fallback_error
+            if not rescued:
+                log.error(f"Download failed for {download_url}: {e}")
+                failed.append(download_url)
     log.info(
         f"Done: {len(new) - len(failed)} downloaded, {len(failed)} failed, "
         f"{len(existing)} skipped (already present)"
