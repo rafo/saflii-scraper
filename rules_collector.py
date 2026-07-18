@@ -15,8 +15,9 @@ Sources (see "Datenquellen SA-Recht.md" in the RE3 Obsidian vault):
 
 Unlike the SAFLII crawler this is not a long-running scraper: the corpus
 is a few hundred PDFs that change rarely, so the intended use is an
-occasional manual run (dry-run first, then --apply). Files land in the
-same collection tree as the SAFLII documents, as their own category:
+occasional manual run (dry-run first, then --apply). Files land in their
+own collection folder (one collection per corpus, next to the SAFLII
+collection on the NAS), with the same inner layout convention:
 
     <base>/pdf/za/rules/<section>/<title> [<urlhash>].pdf
 
@@ -49,7 +50,7 @@ from saflii_utils import _INVALID_FILENAME_CHARS, MAX_FILENAME_BASE_LENGTH
 
 log = logging.getLogger(__name__)
 
-DEFAULT_DATA_DIR = "/Volumes/data/Work/RE3_scraper_saflii_data"
+DEFAULT_DATA_DIR = "/Volumes/data/Work/RE3_scraper_rules_data"
 
 JUSTICE_RULES_URL = "https://www.justice.gov.za/legislation/rules/rules.htm"
 # Carries both the sitewide directives menu (section discovery) and a few
@@ -254,8 +255,8 @@ def main():
     parser.add_argument("--section", help="only sections whose slug contains this substring")
     parser.add_argument(
         "--data-dir",
-        default=os.environ.get("SAFLII_DATA_DIR", DEFAULT_DATA_DIR),
-        help="collection base directory (default: $SAFLII_DATA_DIR or NAS mount)",
+        default=os.environ.get("RULES_DATA_DIR", DEFAULT_DATA_DIR),
+        help="collection base directory (default: $RULES_DATA_DIR or NAS mount)",
     )
     args = parser.parse_args()
 

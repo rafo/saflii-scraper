@@ -17,7 +17,9 @@ Zugehörige Orte außerhalb dieses Repos:
 - RE3-Planung/Notizen (Obsidian): `/Users/rafael/data/Work/RE3/`
   (`RE3.AI.md`, `RE3 Deployment Plan.md`, `ToDo.md`)
 - Scrape-Sammlung: NAS `/volume1/data/Work/RE3_scraper_saflii_data`,
-  vom Mac aus als SMB-Mount `/Volumes/data/Work/RE3_scraper_saflii_data`
+  vom Mac aus als SMB-Mount `/Volumes/data/Work/RE3_scraper_saflii_data`;
+  je Korpus ein eigener Sammlungsordner daneben (z. B.
+  `RE3_scraper_rules_data` für den Rules-Collector)
 
 ## Git-Remotes (Achtung)
 

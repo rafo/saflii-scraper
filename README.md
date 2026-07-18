@@ -129,12 +129,18 @@ uv run python rules_collector.py --section western-cape # Sektions-Filter (Subst
 uv run python rules_collector.py --apply                # lädt herunter
 ```
 
-Ablage im selben Sammlungs-Baum als eigene Kategorie:
+Ablage in einer **eigenen Sammlung** (ein Sammlungsordner pro Korpus,
+neben der SAFLII-Sammlung), innen nach derselben Layout-Konvention:
 `<Zielverzeichnis>/pdf/za/rules/<Sektion>/<Titel> [<URL-Hash>].pdf`
 (z.B. `rules/high-court-of-south-africa/western-cape-division-of-the-high-court/…`).
-Der 8-stellige URL-Hash im Namen hält Dateien eindeutig — Directive-Titel
-wiederholen sich auf den Listenseiten fast wörtlich. Zielverzeichnis via
-`--data-dir` oder `SAFLII_DATA_DIR` (Default: NAS-Mount). Vorhandene
+Die Sektions-Ebene trennt zugleich die Quellen (`consolidated-rules` =
+justice.gov.za, Gerichts-Sektionen = judiciary.org.za, `bar-association`
+= nationalbar.co.za). Der 8-stellige URL-Hash im Namen hält Dateien
+eindeutig — Directive-Titel wiederholen sich auf den Listenseiten fast
+wörtlich. Zielverzeichnis via `--data-dir` oder `RULES_DATA_DIR`
+(Default: `/Volumes/data/Work/RE3_scraper_rules_data`, NAS-Mount; auf
+dem NAS: `/volume1/data/Work/RE3_scraper_rules_data` — im Container
+entsprechend mounten). Vorhandene
 Dateien werden übersprungen; Nicht-PDF-Antworten (Soft-404s) werden
 verworfen statt gespeichert. Scheitert ein Live-Download (tote Links
 kommen auf justice.gov.za und judiciary.org.za regelmäßig vor), versucht
