@@ -76,9 +76,17 @@ docker logs -f saflii-scraper
   (NAS) nach `/downloads` und setzt `SAFLII_DATA_DIR` entsprechend —
   Volume-Nummer in DSM prüfen. Für den Rules-Collector zusätzlich
   `RE3_scraper_rules_data` mounten und `RULES_DATA_DIR` setzen.
-- Das benannte Volume `saflii-storage` hält die Crawlee-Queue → nach
-  Container-Neustart wird fortgesetzt statt neu begonnen; zusätzlich
-  überspringt der Scraper ohnehin alle bereits vorhandenen Dateien.
+- Das benannte Volume `saflii-storage` hält die Crawlee-Queue; das Image
+  setzt `CRAWLEE_PURGE_ON_START=false` (Crawlee würde diese Queue sonst
+  bei **jedem** Prozessstart komplett leeren — Standardverhalten der
+  Bibliothek, empirisch verifiziert Juli 2026). Damit setzt ein
+  Container-Neustart mitten im Crawl tatsächlich fort, statt die komplette
+  Seite (alle Gerichte, alle Jahre) neu abzulaufen. Unabhängig davon
+  überspringt der Scraper ohnehin jede bereits vorhandene Datei — das
+  greift aber erst, nachdem die zugehörige HTML-Seite erneut besucht
+  wurde (für den Titel/Dateinamen), spart also nur den Download, nicht
+  den Seitenbesuch. Bei einem Voll-Crawl mit zehntausenden Urteilen macht
+  genau dieser Unterschied den Neustart-Verlust aus (Tage statt Minuten).
 - Filter per Env im Stack setzen, z.B. `SAFLII_FILTER_COURT=ZAWCHC`.
 
 **Zeitplan im Container (`scheduler.py`):** Der Container startet
