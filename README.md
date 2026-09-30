@@ -30,7 +30,7 @@ Pipe) gelten automatisch Env-Wert bzw. Default:
 | `SAFLII_DATA_DIR` | Zielverzeichnis | Ablageort der Downloads | `/Volumes/data/Work/RE3_scraper_saflii_data` (NAS via SMB) |
 | `SAFLII_LOG_DIR` | — | Ablageort der Logfiles | `<SAFLII_DATA_DIR>/logs` |
 | `SAFLII_LOG_RETENTION_DAYS` | — | Logfiles älter als N Tage werden beim Start gelöscht (`0` = nie) | `30` |
-| `SAFLII_NTFY_URL` | — | ntfy-Topic-URL für Push-Benachrichtigungen; leer setzen (`SAFLII_NTFY_URL=`) schaltet sie ab | `http://ntfy:8080/scraper-saflii` (ntfy im Komodo-Netz auf dem NAS) |
+| `SAFLII_NTFY_URL` | — | ntfy-Topic-URL für Push-Benachrichtigungen; leer setzen (`SAFLII_NTFY_URL=`) schaltet sie ab | `http://ntfy:8080/scraper-saflii` (ntfy im `homelab`-Docker-Netz auf dem NAS) |
 | `SAFLII_NTFY_TOKEN` | — | ntfy-Access-Token (wird als `Authorization: Bearer` mitgeschickt) | aus (kein Auth-Header) |
 
 Jeder Lauf schreibt zusätzlich zur Konsole ein eigenes Logfile
@@ -49,14 +49,14 @@ derselben Statistik an das [ntfy](https://ntfy.sh)-Topic aus
 einer Exception, kommt stattdessen eine `Scrape CRASHED`-Meldung mit
 hoher Priorität. Eine fehlgeschlagene Benachrichtigung wird nur geloggt
 und beeinflusst den Lauf nicht. Produktiv zeigt der Default auf die
-selbst gehostete ntfy-Instanz im Komodo-Stack auf dem NAS (der
-Scraper-Container läuft dafür im `network_mode: komodo_default`);
+selbst gehostete ntfy-Instanz auf dem NAS (der Scraper-Container läuft
+dafür im gemeinsamen Docker-Netz `homelab`, in dem auch ntfy hängt);
 verlangt die Instanz Auth, das Access-Token per `SAFLII_NTFY_TOKEN`
 mitgeben. Lokal auf dem Mac ist der ntfy-Host nicht erreichbar — die
 Benachrichtigung schlägt dann still fehl (nur Log-Warnung), oder man
 setzt `SAFLII_NTFY_URL=` bzw. eine eigene Topic-URL.
 
-### Betrieb als Docker-Container (NAS/Komodo)
+### Betrieb als Docker-Container (NAS/Dockhand)
 
 Der Scraper läuft dauerhaft am besten auf dem NAS (Birdsnest, x86_64) —
 tagelange Crawls hängen dann nicht am Mac, und die Daten entstehen direkt
@@ -64,9 +64,12 @@ auf dem NAS-Volume.
 
 Das Image wird von **GitHub Actions** gebaut (bei jedem Push auf `main`)
 und liegt öffentlich unter `ghcr.io/rafo/saflii-scraper:latest` — das NAS
-pullt es ohne Anmeldung. In Komodo läuft er als **UI-defined Stack**; der
-Compose-Inhalt liegt direkt in der Komodo-UI, nicht im Repo (nichts muss
-auf dem Server liegen).
+pullt es ohne Anmeldung. In Dockhand läuft er als **UI-defined Stack**; der
+Compose-Inhalt liegt direkt in der Dockhand-UI, nicht im Repo (nichts muss
+auf dem Server liegen). Der Container muss dem Docker-Netz `homelab`
+beitreten (`networks: [homelab]` im Compose, als `external: true`
+referenziert), sonst erreicht er die ntfy-Instanz nicht unter ihrem
+Kurznamen.
 
 ```bash
 docker logs -f saflii-scraper
@@ -126,7 +129,7 @@ Deployment:
 
 ```bash
 git push                      # GitHub Actions baut + pusht das Image
-# danach: Stack in Komodo redeployen (pullt :latest)
+# danach: Stack in Dockhand redeployen (pullt :latest)
 ```
 
 **Warum `pdf,html` als Default:** Das PDF ist das Original-Gerichtsdokument

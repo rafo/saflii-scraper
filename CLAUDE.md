@@ -31,9 +31,12 @@ Zugehörige Orte außerhalb dieses Repos:
 ## Deployment
 
 Produktiv läuft der Scraper als Container auf dem NAS „Birdsnest" (x86_64),
-verwaltet als UI-defined Stack in Komodo (Compose-Inhalt liegt in der
-Komodo-UI, nicht im Repo). Ablauf: `git push` → Actions baut das Image →
-Stack in Komodo redeployen (pullt `:latest`). Details im README.
+verwaltet als UI-defined Stack in Dockhand (Compose-Inhalt liegt in der
+Dockhand-UI, nicht im Repo). Ablauf: `git push` → Actions baut das Image →
+Stack in Dockhand redeployen (pullt `:latest`). Details im README.
+
+Docker-Netz `homelab` (nicht mehr `komodo_default`, seit dem Wechsel von
+Komodo zu Dockhand) verbindet Scraper und ntfy-Instanz auf dem NAS.
 
 ## Code-Landkarte
 
@@ -55,7 +58,7 @@ Stack in Komodo redeployen (pullt `:latest`). Details im README.
 - `saflii_processor_yearly_ori.py` — eingefrorener Originalstand, nicht
   weiterentwickeln
 - `docker-compose.yml` — Altlast aus der Kotaemon-Evaluierung, gehört nicht
-  zum Scraper (das Produktiv-Compose liegt in Komodo)
+  zum Scraper (das Produktiv-Compose liegt in Dockhand)
 
 ## Harte Randbedingungen (nicht „optimieren")
 

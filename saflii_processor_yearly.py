@@ -188,7 +188,7 @@ def cleanup_old_logs(log_dir):
 def notify_ntfy(message, priority="default"):
     """Push a notification to the ntfy topic in SAFLII_NTFY_URL.
 
-    Default ist die ntfy-Instanz im Komodo-Netz auf dem NAS; leerer Wert
+    Default ist die ntfy-Instanz im `homelab`-Docker-Netz auf dem NAS; leerer Wert
     (`SAFLII_NTFY_URL=`) schaltet Benachrichtigungen ab. Never raises — a
     failed notification must not take down or mask the actual scrape result.
     """
