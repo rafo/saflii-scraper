@@ -7,5 +7,11 @@ requires-python = ">=3.13"
 dependencies = [
     "beautifulsoup4>=4.13.4",
     "crawlee[all]>=0.6.8",
+    # crawlee[all] pulls this in unpinned; uv.lock had frozen it at 0.10.0
+    # (Mar 2025). Cloudflare fingerprints that build's chrome-impersonation
+    # TLS handshake as a bot on Linux and blocks it with a JS challenge —
+    # verified 2026-09-30 against the exact production image (same request
+    # gets 200 on 0.16.3, 403 on 0.10.0). Keep current.
+    "curl-cffi>=0.16.3",
     "ragflow-sdk>=0.26.4",
 ]
