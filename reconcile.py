@@ -87,7 +87,7 @@ def main():
 
     if args.apply:
         log_path = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)),
+            args.base_dir,
             f"reconcile_log_{datetime.now():%Y%m%d_%H%M%S}.json",
         )
         with open(log_path, "w", encoding="utf-8") as fh:
