@@ -1,0 +1,10 @@
+version: 2
+updates:
+  # curl-cffi's Chrome-impersonation fingerprint goes stale as Cloudflare
+  # catches up (see CLAUDE.md) — weekly PRs catch that before it silently
+  # breaks the scraper again. Review + merge still triggers the existing
+  # build-image.yml on push to main; redeploy in Dockhand stays manual.
+  - package-ecosystem: "uv"
+    directory: "/"
+    schedule:
+      interval: "weekly"

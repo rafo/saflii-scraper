@@ -66,6 +66,15 @@ Komodo zu Dockhand) verbindet Scraper und ntfy-Instanz auf dem NAS.
   sperrt dann die IP. Concurrency/Rate im Crawler nicht erhöhen.
 - **403-Schutz:** Nur mit `CurlImpersonateHttpClient(impersonate="chrome")`
   kommt man durch; PDF/RTF brauchen zusätzlich einen `Referer`-Header.
+- **`curl-cffi` veraltet schleichend:** Die Bibliothek emuliert einen
+  Chrome-TLS-Fingerprint; Cloudflare erkennt ältere Builds irgendwann und
+  blockt dann *jeden* Request mit einer JS-Challenge — ganz ohne Crash,
+  der Scraper läuft augenscheinlich normal durch, verarbeitet aber real
+  null Dokumente (genau das ist 2026-09 passiert, `uv.lock` hatte
+  `curl-cffi` seit März 2025 eingefroren). Dependabot (`.github/dependabot.yml`,
+  `uv`-Ecosystem, wöchentlich) öffnet PRs dagegen automatisch — die muss
+  trotzdem jemand mergen, und nach dem Merge/Image-Rebuild der Stack in
+  Dockhand redeployt werden.
 - **Dateinamen sind API:** Voller SAFLII-Titel als Dateiname (RAGFlow zeigt
   ihn Anwälten als Quelle); die neutrale Zitierung (z. B. `[2024] ZAWCHC 147`)
   ist der stabile Schlüssel für reconcile/sync — Kürzungslogik bei Überlänge
