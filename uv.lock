@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.13"
 
 [[package]]
@@ -1025,15 +1025,15 @@ wheels = [
 
 [[package]]
 name = "ragflow-sdk"
-version = "0.26.4"
+version = "0.27.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "beartype" },
     { name = "requests" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/1f/0b/d249aa1dda5fb159b650775a8cd4ed754137aafa536b11fd40f049d435ad/ragflow_sdk-0.26.4.tar.gz", hash = "sha256:75712f51382ff567f01badea84daa836151c968cf0c7717f93facc60353a02c6", size = 10053, upload-time = "2026-07-07T13:35:28.022Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/90/09/0b22f4f9490d67fb1b9a985ac7d2e5d958eb9daf95d89f088bbcef1f88a4/ragflow_sdk-0.27.3.tar.gz", hash = "sha256:9d4ff3c5001753b0c2821fa9ba428d67a39f09cd99ac61a81b9672c9bae52895", size = 10458, upload-time = "2026-10-23T06:34:21.303Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/81/59/b6aeb6aaa2832d9011ed17bc9f78df8aaf36840a3ffd5c6b6fe8ae9f7bf8/ragflow_sdk-0.26.4-py3-none-any.whl", hash = "sha256:30b79776013a23fd9da59a04fa6deed29f4a83b9741dd68322eddbbdc533175d", size = 17492, upload-time = "2026-07-07T13:35:28.987Z" },
+    { url = "https://files.pythonhosted.org/packages/a5/f0/3f912c15a8e31c7b2fe0ed493ff8e561b02afd01910891a62eda8cdd4c36/ragflow_sdk-0.27.3-py3-none-any.whl", hash = "sha256:1288dd7787cb7da9b07b7cfd111b29855513722e3adff0a1a21f3fed8d9eab53", size = 17926, upload-time = "2026-10-23T06:34:20.432Z" },
 ]
 
 [[package]]
