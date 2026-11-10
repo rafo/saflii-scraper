@@ -411,7 +411,7 @@ async def main():
     )
 
     # Keep the last known collection counts; recounting ~100k files on the
-    # NAS only happens once, at the end of the run
+    # NAS happens once per run, at the end
     status = read_status(config.data_dir)
     status.update(
         running=True,
@@ -424,6 +424,9 @@ async def main():
         documents_seen=0,
     )
     status.pop("error", None)
+    if "courts" not in status:  # very first run: count now, not in days
+        status["courts"] = count_collection(config.data_dir)
+        status["totals"] = collection_totals(status["courts"])
     write_status(config.data_dir, status)
 
     @crawler.router.default_handler
