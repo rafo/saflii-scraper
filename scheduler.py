@@ -31,15 +31,19 @@ import logging
 import os
 import subprocess
 import sys
+import threading
 import time
 from datetime import datetime, timedelta
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from saflii_processor_yearly import DEFAULT_DATA_DIR, notify_ntfy
+from saflii_processor_yearly import DEFAULT_DATA_DIR, notify_ntfy, read_status
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(name)s:%(message)s")
 log = logging.getLogger("scheduler")
 
 CHECK_INTERVAL_SECONDS = 15 * 60
+# status.json for the Glance dashboard, reachable inside the homelab network
+STATUS_PORT = int(os.environ.get("SAFLII_STATUS_PORT", "8000"))
 
 DATA_DIR = os.environ.get("SAFLII_DATA_DIR", DEFAULT_DATA_DIR)
 STATE_FILE = os.environ.get("SCHEDULER_STATE_FILE") or os.path.join(
@@ -116,7 +120,31 @@ def run_job(job):
     return True
 
 
+class StatusHandler(BaseHTTPRequestHandler):
+    """Any GET: the crawler's status.json plus the next scheduled scrape."""
+
+    def do_GET(self):
+        status = read_status(DATA_DIR)
+        last_run = (load_state() or {}).get("saflii-scrape")
+        interval = job_interval(JOBS[0])
+        if last_run and interval:
+            status["next_run_due"] = f"{last_run + interval:%Y-%m-%d %H:%M}"
+        body = json.dumps(status).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *args):
+        pass  # Glance polls every minute; keep docker logs readable
+
+
 def main():
+    server = ThreadingHTTPServer(("", STATUS_PORT), StatusHandler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    log.info(f"Status endpoint on port {STATUS_PORT}")
+
     state = load_state()
     if state is None:
         # First start: mark everything as freshly run so a (re)deploy never

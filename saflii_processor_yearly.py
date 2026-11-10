@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import os
 import random
@@ -218,6 +219,58 @@ def notify_ntfy(message, priority="default"):
         log.warning(f"Could not send ntfy notification to {url}: {e}")
 
 
+def status_path(data_dir):
+    """status.json for dashboards (served by scheduler.py, shown in Glance)."""
+    return os.path.join(data_dir, "logs", "status.json")
+
+
+def read_status(data_dir):
+    try:
+        with open(status_path(data_dir), encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
+def write_status(data_dir, status):
+    """Atomic write; never raises — a dashboard must not break a scrape."""
+    path = status_path(data_dir)
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(f"{path}.tmp", "w", encoding="utf-8") as f:
+            json.dump(status, f, indent=2)
+        os.replace(f"{path}.tmp", path)
+    except OSError as e:
+        log.warning(f"Could not write status {path}: {e}")
+
+
+def count_collection(data_dir):
+    """Files and newest year per court (pdf/html), largest court first."""
+    courts = {}
+    for fmt in ("pdf", "html"):
+        root = os.path.join(data_dir, fmt, "za", "cases")
+        if not os.path.isdir(root):
+            continue
+        for court in os.listdir(root):
+            court_dir = os.path.join(root, court)
+            if court.startswith(("@", ".")) or not os.path.isdir(court_dir):
+                continue
+            entry = courts.setdefault(
+                court, {"court": court, "pdf": 0, "html": 0, "latest_year": ""}
+            )
+            for dirpath, dirs, files in os.walk(court_dir):
+                # Synology puts @eaDir thumbnail folders everywhere
+                dirs[:] = [d for d in dirs if not d.startswith(("@", "."))]
+                entry[fmt] += sum(1 for name in files if not name.startswith("."))
+            years = [y for y in os.listdir(court_dir) if y.isdigit()]
+            entry["latest_year"] = max([entry["latest_year"], *years])
+    return sorted(courts.values(), key=lambda c: -(c["pdf"] + c["html"]))
+
+
+def collection_totals(courts):
+    return {fmt: sum(c[fmt] for c in courts) for fmt in ("pdf", "html")}
+
+
 def write_collection_readme(config, stats):
     """Self-describing marker at the collection root: source + last run.
 
@@ -357,6 +410,22 @@ async def main():
         f"data_dir={config.data_dir}, logfile={log_path}"
     )
 
+    # Keep the last known collection counts; recounting ~100k files on the
+    # NAS only happens once, at the end of the run
+    status = read_status(config.data_dir)
+    status.update(
+        running=True,
+        started=f"{datetime.now():%Y-%m-%d %H:%M}",
+        filter={
+            "court": config.filter_court or "all",
+            "year": config.filter_year or "all",
+            "formats": ",".join(config.formats),
+        },
+        documents_seen=0,
+    )
+    status.pop("error", None)
+    write_status(config.data_dir, status)
+
     @crawler.router.default_handler
     async def handle_page(context: BeautifulSoupCrawlingContext):
         url = context.request.url
@@ -428,7 +497,17 @@ async def main():
                     f"{success_count}/{len(config.formats)} successful"
                 )
 
-    stats = await crawler.run(build_start_urls(config))
+            status["documents_seen"] += 1
+            if status["documents_seen"] % 25 == 0:
+                status["last_document"] = url
+                write_status(config.data_dir, status)
+
+    try:
+        stats = await crawler.run(build_start_urls(config))
+    except Exception as e:
+        status.update(running=False, error=repr(e))
+        write_status(config.data_dir, status)
+        raise
 
     # Explicit completion marker: crawlee's own loggers do not propagate to
     # the root logger, so the statistics would otherwise never reach the file
@@ -448,6 +527,25 @@ async def main():
         priority="high" if empty else "default",
     )
     write_collection_readme(config, stats)
+
+    previous_totals = status.get("totals")
+    status["courts"] = count_collection(config.data_dir)
+    status["totals"] = collection_totals(status["courts"])
+    status.update(
+        running=False,
+        finished=f"{datetime.now():%Y-%m-%d %H:%M}",
+        result={
+            "requests": stats.requests_finished,
+            "failed": stats.requests_failed,
+            "runtime": str(stats.crawler_runtime).split(".")[0],
+        },
+        new_files=(
+            sum(status["totals"].values()) - sum(previous_totals.values())
+            if previous_totals
+            else None
+        ),
+    )
+    write_status(config.data_dir, status)
 
 
 if __name__ == "__main__":

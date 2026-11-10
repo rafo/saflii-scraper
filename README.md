@@ -32,6 +32,7 @@ Pipe) gelten automatisch Env-Wert bzw. Default:
 | `SAFLII_LOG_RETENTION_DAYS` | — | Logfiles älter als N Tage werden beim Start gelöscht (`0` = nie) | `30` |
 | `SAFLII_NTFY_URL` | — | ntfy-Topic-URL für Push-Benachrichtigungen; leer setzen (`SAFLII_NTFY_URL=`) schaltet sie ab | `http://ntfy:8080/scraper-saflii` (ntfy im `homelab`-Docker-Netz auf dem NAS) |
 | `SAFLII_NTFY_TOKEN` | — | ntfy-Access-Token (wird als `Authorization: Bearer` mitgeschickt) | aus (kein Auth-Header) |
+| `SAFLII_STATUS_PORT` | — | Port des Status-Endpunkts im Scheduler (liefert `logs/status.json` + nächsten Lauftermin, z. B. für Glance) | `8000` |
 
 Jeder Lauf schreibt zusätzlich zur Konsole ein eigenes Logfile
 (`logs/scrape_<zeitstempel>.log`, neben der Sammlung → überlebt
@@ -95,6 +96,12 @@ docker logs -f saflii-scraper
   sonst gelten alle Start-URLs als erledigt und jeder Wochenlauf endet
   sofort mit 0 Requests (so geschehen Okt.–Nov. 2026). Ein Lauf mit
   0 Requests meldet ntfy deshalb mit hoher Priorität („did NOTHING“).
+- **Status für Dashboards:** Jeder Lauf pflegt `logs/status.json` (läuft?,
+  Filter, bearbeitete Urteile, Bestand je Gericht, Ergebnis des letzten
+  Laufs); der Bestand wird nur am Laufende neu gezählt. Der Scheduler
+  liefert die Datei plus `next_run_due` unter
+  `http://saflii-scraper:8000/status.json` im `homelab`-Netz aus — die
+  Glance-Lab-Seite zeigt das als Widget „SAFLII Scraper“ an.
 - Filter per Env im Stack setzen, z.B. `SAFLII_FILTER_COURT=ZAWCHC`.
 
 **Zeitplan im Container (`scheduler.py`):** Der Container startet
