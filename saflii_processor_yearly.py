@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 from crawlee import ConcurrencySettings, Request
 from crawlee.crawlers import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 from crawlee.http_clients import CurlImpersonateHttpClient
+from crawlee.storages import RequestQueue
 
 from saflii_utils import (
     build_file_path,
@@ -297,15 +298,25 @@ async def download_and_save_file(url, http_client, filename_base, referer_url, b
         return False
 
 
+async def open_request_queue():
+    """Resume an interrupted crawl, but start a finished one from scratch.
+
+    CRAWLEE_PURGE_ON_START=false (Dockerfile) keeps the queue across
+    container restarts so an interrupted crawl resumes. A *completed* crawl
+    however leaves every start URL marked as handled, and each later
+    scheduled run then finished instantly with 0 requests (Oct 2026).
+    """
+    queue = await RequestQueue.open()
+    if await queue.is_finished():
+        await queue.drop()
+        queue = await RequestQueue.open()
+    else:
+        log.info("Resuming unfinished request queue from a previous run")
+    return queue
+
+
 async def main():
     config = get_user_config()
-
-    log_path = setup_file_logging(config.data_dir)
-    log.info(
-        f"Scrape started: court={config.filter_court or 'all'}, "
-        f"year={config.filter_year or 'all'}, formats={config.formats}, "
-        f"data_dir={config.data_dir}, logfile={log_path}"
-    )
 
     # saflii.org blocks plain HTTP clients (403); impersonate a real browser
     http_client = CurlImpersonateHttpClient(
@@ -320,6 +331,7 @@ async def main():
     tasks_per_minute = max(20 // len(config.formats), 5)
 
     crawler = BeautifulSoupCrawler(
+        request_manager=await open_request_queue(),
         http_client=http_client,
         max_request_retries=5,
         max_requests_per_crawl=MAX_REQUESTS_PER_CRAWL,
@@ -328,6 +340,15 @@ async def main():
         concurrency_settings=ConcurrencySettings(
             max_concurrency=1, max_tasks_per_minute=tasks_per_minute
         ),
+    )
+
+    # Only now: constructing the crawler strips all root-logger handlers
+    # (crawlee's configure_logging), which silently dropped the logfile
+    log_path = setup_file_logging(config.data_dir)
+    log.info(
+        f"Scrape started: court={config.filter_court or 'all'}, "
+        f"year={config.filter_year or 'all'}, formats={config.formats}, "
+        f"data_dir={config.data_dir}, logfile={log_path}"
     )
 
     @crawler.router.default_handler
@@ -410,11 +431,15 @@ async def main():
         f"{stats.requests_failed} failed, runtime {stats.crawler_runtime}\n"
         f"{stats.to_table()}"
     )
+    # 0 requests is never a successful scrape — it went unnoticed for weeks
+    empty = stats.requests_finished == 0
     notify_ntfy(
-        f"Scrape finished (court={config.filter_court or 'all'}, "
+        f"Scrape {'did NOTHING' if empty else 'finished'} "
+        f"(court={config.filter_court or 'all'}, "
         f"year={config.filter_year or 'all'}): "
         f"{stats.requests_finished} requests, {stats.requests_failed} failed, "
-        f"runtime {stats.crawler_runtime}"
+        f"runtime {stats.crawler_runtime}",
+        priority="high" if empty else "default",
     )
     write_collection_readme(config, stats)
 

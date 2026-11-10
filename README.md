@@ -90,6 +90,11 @@ docker logs -f saflii-scraper
   wurde (für den Titel/Dateinamen), spart also nur den Download, nicht
   den Seitenbesuch. Bei einem Voll-Crawl mit zehntausenden Urteilen macht
   genau dieser Unterschied den Neustart-Verlust aus (Tage statt Minuten).
+  Fortgesetzt wird nur eine **unfertige** Queue: Ist der vorige Lauf
+  komplett durch, verwirft der Scraper die Queue und startet frisch —
+  sonst gelten alle Start-URLs als erledigt und jeder Wochenlauf endet
+  sofort mit 0 Requests (so geschehen Okt.–Nov. 2026). Ein Lauf mit
+  0 Requests meldet ntfy deshalb mit hoher Priorität („did NOTHING“).
 - Filter per Env im Stack setzen, z.B. `SAFLII_FILTER_COURT=ZAWCHC`.
 
 **Zeitplan im Container (`scheduler.py`):** Der Container startet
