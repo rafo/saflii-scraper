@@ -1,4 +1,4 @@
-"""Queue resume/fresh-start logic and the per-run logfile.
+"""Court filter list, queue resume/fresh-start logic and the per-run logfile.
 
 Run: uv run python tests/test_scrape_state.py  (or pytest, if installed)
 """
@@ -48,7 +48,18 @@ def test_logfile_survives_crawler_init():
     )
 
 
+def test_court_filter_list():
+    config = p.ScraperConfig(" ZASCA, ZAGPJHC ", None, "html")
+    assert config.courts == ["ZASCA", "ZAGPJHC"]
+    assert p.build_start_urls(config) == [
+        "https://www.saflii.org/za/cases/ZASCA/",
+        "https://www.saflii.org/za/cases/ZAGPJHC/",
+    ]
+    assert p.ScraperConfig(None, None, "html").courts == []
+
+
 if __name__ == "__main__":
+    test_court_filter_list()
     test_request_queue_resume_or_fresh()
     test_logfile_survives_crawler_init()
     print("OK")

@@ -56,6 +56,11 @@ class ScraperConfig:
     data_dir: str = DEFAULT_DATA_DIR
 
     @property
+    def courts(self):
+        """Court filter as a list; SAFLII_FILTER_COURT may be comma-separated."""
+        return [c.strip() for c in (self.filter_court or "").split(",") if c.strip()]
+
+    @property
     def formats(self):
         if self.download_format == "all":
             return list(VALID_FORMATS)
@@ -89,7 +94,7 @@ def get_user_config() -> ScraperConfig:
 
     filter_court = setting(
         "SAFLII_FILTER_COURT",
-        "Enter FILTER_COURT (e.g., 'ZAWCHC' or press Enter for all courts): ",
+        "Enter FILTER_COURT (e.g., 'ZAWCHC' or 'ZASCA,ZAGPJHC'; Enter for all courts): ",
     ) or None
 
     filter_year = setting(
@@ -252,12 +257,13 @@ def build_start_urls(config):
     them, which quickly exhausts saflii.org's rate limit. Note: direct
     start URLs assume South African courts (za).
     """
-    if config.filter_court and config.filter_year:
+    if config.courts and config.filter_year:
         return [
-            f"https://www.saflii.org/za/cases/{config.filter_court}/{config.filter_year}/"
+            f"https://www.saflii.org/za/cases/{court}/{config.filter_year}/"
+            for court in config.courts
         ]
-    if config.filter_court:
-        return [f"https://www.saflii.org/za/cases/{config.filter_court}/"]
+    if config.courts:
+        return [f"https://www.saflii.org/za/cases/{court}/" for court in config.courts]
     return ["https://www.saflii.org/content/databases.html"]
 
 
@@ -365,7 +371,7 @@ async def main():
 
         court_match = COURT_PAGE_RE.search(url)
         if court_match:
-            if config.filter_court and court_match.group(1) != config.filter_court:
+            if config.courts and court_match.group(1) not in config.courts:
                 log.info(f"Skipping court (filter active): {url}")
                 return
             # Stage 2: Court -> Enqueue year links
@@ -377,7 +383,7 @@ async def main():
         year_match = YEAR_PAGE_RE.search(url)
         if year_match:
             court, year = year_match.groups()
-            if config.filter_court and court != config.filter_court:
+            if config.courts and court not in config.courts:
                 log.info(f"Skipping court (filter active): {url}")
                 return
             if config.filter_year and year != config.filter_year:

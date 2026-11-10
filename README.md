@@ -24,7 +24,7 @@ Pipe) gelten automatisch Env-Wert bzw. Default:
 
 | Env-Variable | Prompt | Bedeutung | Default |
 |---|---|---|---|
-| `SAFLII_FILTER_COURT` | `FILTER_COURT` | Gerichtskürzel, z.B. `ZAWCHC` | alle Gerichte |
+| `SAFLII_FILTER_COURT` | `FILTER_COURT` | Gerichtskürzel, z.B. `ZAWCHC`, oder Liste `ZASCA,ZAGPJHC` | alle Gerichte |
 | `SAFLII_FILTER_YEAR` | `FILTER_YEAR` | Jahr, z.B. `2024` | alle Jahre |
 | `SAFLII_FORMATS` | Format(e) | `html`, `pdf`, `rtf`, `all` oder Kombination wie `pdf,html` | `pdf,html` |
 | `SAFLII_DATA_DIR` | Zielverzeichnis | Ablageort der Downloads | `/Volumes/data/Work/RE3_scraper_saflii_data` (NAS via SMB) |
